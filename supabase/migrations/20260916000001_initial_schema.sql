@@ -552,6 +552,9 @@ CREATE POLICY "Public read access for worker services" ON public.worker_services
 CREATE POLICY "Public read access for worker certifications" ON public.worker_certifications FOR SELECT USING (true);
 CREATE POLICY "Public read access for worker availability" ON public.worker_availability FOR SELECT USING (true);
 CREATE POLICY "Public read access for ratings" ON public.ratings FOR SELECT USING (true);
+CREATE POLICY "Public read access for feedback" ON public.feedback FOR SELECT USING (true);
+CREATE POLICY "Public insert access for ratings" ON public.ratings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public insert access for feedback" ON public.feedback FOR INSERT WITH CHECK (true);
 
 -- User Profiles: Users can view all non-sensitive info, update own profile, Admins full access
 CREATE POLICY "Users can read own profile or admins read all" ON public.profiles FOR SELECT USING (true);

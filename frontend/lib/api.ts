@@ -1,4 +1,4 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -68,7 +68,7 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     });
   } catch (err: any) {
     if (err?.message === "Failed to fetch" || err?.name === "TypeError") {
-      throw new Error("Unable to connect to backend server. Please verify the backend is running on port 8000.");
+      throw new Error("Unable to connect to the cooperative service. Please try again.");
     }
     throw err;
   }
