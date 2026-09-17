@@ -42,6 +42,15 @@ export async function POST(req: NextRequest) {
       payment.provider = method;
     }
 
+    if (succeed) {
+      try {
+        const { recordPaymentInSupabase } = await import("@/lib/supabase/db");
+        await recordPaymentInSupabase(booking.id, booking.total_amount, method, utr);
+      } catch (dbErr) {
+        console.warn("Supabase payment persistence warning:", dbErr);
+      }
+    }
+
     const invoiceNo = `INV-TN-COOP-2026-${booking.id.toString().padStart(4, "0")}`;
 
     if (succeed) {

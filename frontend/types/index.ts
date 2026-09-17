@@ -26,6 +26,11 @@ export interface UserProfile {
   avg_rating?: number;
   rating_count?: number;
   experience_years?: number;
+  avatar_url?: string;
+  bio?: string;
+  upi_id?: string;
+  upi_qr_url?: string;
+  address?: string;
 }
 
 export interface ServiceItem {
@@ -58,6 +63,11 @@ export interface MatchedWorker {
   experience_years: number;
   reasons: string[];
   verification_status?: string;
+  avatar_url?: string;
+  bio?: string;
+  upi_id?: string;
+  upi_qr_url?: string;
+  address?: string;
 }
 
 export interface BookingRecord {

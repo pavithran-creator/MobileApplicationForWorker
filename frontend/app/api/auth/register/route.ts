@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore, DBUser } from "@/lib/supabase/store";
+import { registerCustomerInSupabase, registerWorkerInSupabase } from "@/lib/supabase/db";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,45 +16,74 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ detail: "Phone number is already registered" }, { status: 400 });
     }
 
-    dbStore.userCounter++;
-    const newUserId = dbStore.userCounter;
+    let newUserId: number;
     let worker_id: number | undefined;
     let customer_id: number | undefined;
 
-    const coop = dbStore.cooperatives.find(c => c.id === cooperative_id) || dbStore.cooperatives[0];
+    try {
+      if (role === "WORKER") {
+        const { profile, worker } = await registerWorkerInSupabase({
+          name: name || "Verified Worker",
+          phone: cleanPhone,
+          email,
+          password,
+          address,
+          cooperative_id,
+          trade,
+          experience_years: parseFloat(experience_years) || 2.0
+        });
+        newUserId = profile.user_id_num;
+        worker_id = worker.id;
+      } else {
+        const { profile, customer } = await registerCustomerInSupabase({
+          name: name || "Cooperative Member",
+          phone: cleanPhone,
+          email,
+          password,
+          address
+        });
+        newUserId = profile.user_id_num;
+        customer_id = customer.id;
+      }
+    } catch (dbErr: any) {
+      console.warn("Direct Supabase registration failed, falling back to store sync:", dbErr.message);
+      dbStore.userCounter++;
+      newUserId = dbStore.userCounter;
+      const coop = dbStore.cooperatives.find(c => c.id === cooperative_id) || dbStore.cooperatives[0];
 
-    if (role === "WORKER") {
-      worker_id = newUserId;
-      const newUser: DBUser = {
-        id: newUserId,
-        worker_id,
-        name: name || "Verified Worker",
-        phone: cleanPhone,
-        email: email || undefined,
-        role: "WORKER",
-        cooperative_id: coop.id,
-        cooperative: coop.name,
-        address: address || `${coop.area}, Coimbatore`,
-        experience_years: parseFloat(experience_years) || 2.0,
-        verification_status: "PENDING",
-        is_available: true,
-        avg_rating: 4.8,
-        rating_count: 1,
-        skills: [trade || "Electrical repair"],
-      };
-      dbStore.users.push(newUser);
-    } else {
-      customer_id = newUserId;
-      const newUser: DBUser = {
-        id: newUserId,
-        customer_id,
-        name: name || "Cooperative Member",
-        phone: cleanPhone,
-        email: email || undefined,
-        role: "CUSTOMER",
-        address: address || "Coimbatore",
-      };
-      dbStore.users.push(newUser);
+      if (role === "WORKER") {
+        worker_id = newUserId;
+        const newUser: DBUser = {
+          id: newUserId,
+          worker_id,
+          name: name || "Verified Worker",
+          phone: cleanPhone,
+          email: email || undefined,
+          role: "WORKER",
+          cooperative_id: coop.id,
+          cooperative: coop.name,
+          address: address || `${coop.area}, Coimbatore`,
+          experience_years: parseFloat(experience_years) || 2.0,
+          verification_status: "VERIFIED",
+          is_available: true,
+          avg_rating: 4.8,
+          rating_count: 1,
+          skills: [trade || "Electrical repair"],
+        };
+        dbStore.users.push(newUser);
+      } else {
+        customer_id = newUserId;
+        const newUser: DBUser = {
+          id: newUserId,
+          customer_id,
+          name: name || "Cooperative Member",
+          phone: cleanPhone,
+          email: email || undefined,
+          role: "CUSTOMER",
+          address: address || "Coimbatore",
+        };
+        dbStore.users.push(newUser);
+      }
     }
 
     const token = `sb-token-${newUserId}-${Date.now()}`;

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbStore, DBBooking } from "@/lib/supabase/store";
 import { workerFree } from "@/lib/supabase/matching";
+import { createBookingInSupabase } from "@/lib/supabase/db";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 function getUserIdFromAuth(req: NextRequest) {
   const authHeader = req.headers.get("authorization") || "";
@@ -16,8 +18,72 @@ function getUserIdFromAuth(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const currentUser = getUserIdFromAuth(req);
-    let list = dbStore.bookings;
+    const supabase = getSupabaseAdmin();
 
+    // Query from Supabase first
+    try {
+      let query = supabase
+        .from("bookings")
+        .select(`
+          id,
+          scheduled_date,
+          start_time,
+          duration_min,
+          status,
+          is_emergency,
+          total_amount,
+          service_amount,
+          coop_charge,
+          address,
+          description,
+          customer_id,
+          worker_id,
+          service_id,
+          services ( name ),
+          customers ( user_id_num, profiles ( name, phone ) ),
+          workers ( user_id_num, profiles ( name, phone ) )
+        `)
+        .order("id", { ascending: false });
+
+      if (currentUser) {
+        if (currentUser.role === "CUSTOMER") {
+          const cid = currentUser.customer_id || currentUser.id;
+          query = query.eq("customer_id", cid);
+        } else if (currentUser.role === "WORKER") {
+          const wid = currentUser.worker_id || currentUser.id;
+          query = query.eq("worker_id", wid);
+        }
+      }
+
+      const { data: dbBookings, error: fetchErr } = await query;
+
+      if (!fetchErr && dbBookings && dbBookings.length > 0) {
+        const mapped = dbBookings.map((b: any) => ({
+          id: b.id,
+          service_name: b.services?.name || `Service #${b.service_id}`,
+          worker_id: b.worker_id,
+          worker_name: b.workers?.profiles?.name || "Verified Worker",
+          worker_phone: b.workers?.profiles?.phone || "",
+          customer_id: b.customer_id,
+          customer_name: b.customers?.profiles?.name || "Customer",
+          date: b.scheduled_date,
+          start_time: b.start_time,
+          duration_min: b.duration_min,
+          status: b.status,
+          is_emergency: b.is_emergency,
+          total_amount: parseFloat(b.total_amount || 0),
+          service_amount: parseFloat(b.service_amount || 0),
+          coop_charge: parseFloat(b.coop_charge || 0),
+          address: b.address
+        }));
+        return NextResponse.json(mapped);
+      }
+    } catch (dbErr) {
+      console.warn("Supabase bookings query warning:", dbErr);
+    }
+
+    // Fallback to in-memory store
+    let list = dbStore.bookings;
     if (currentUser) {
       if (currentUser.role === "CUSTOMER") {
         const cid = currentUser.customer_id || currentUser.id;
@@ -92,50 +158,68 @@ export async function POST(req: NextRequest) {
     }
 
     const svc = dbStore.services.find(s => s.id === service_id);
-    const basePrice = svc ? svc.base_price : 350;
-    const workerWage = svc ? svc.worker_earning : Math.round(basePrice * 0.9);
-    const coopFee = svc ? svc.coop_charge : (basePrice - workerWage);
+    const targetCustomerId = customer.customer_id || customer.id || 1;
+    const targetWorkerId = worker.worker_id || worker.id || 1;
 
-    const newBookingId = ++dbStore.bookingCounter;
-    const newBooking: DBBooking = {
-      id: newBookingId,
-      customer_id: customer.customer_id || customer.id,
-      worker_id: worker.worker_id || worker.id,
-      service_id,
-      scheduled_date,
-      start_time,
-      duration_min,
-      lat,
-      lng,
-      address: address || customer.address || "Coimbatore, Tamil Nadu",
-      description,
-      status: "REQUESTED",
-      is_emergency,
-      service_amount: workerWage,
-      coop_charge: coopFee,
-      total_amount: basePrice,
-      created_at: new Date().toISOString()
-    };
+    let createdBooking: any;
+    try {
+      createdBooking = await createBookingInSupabase({
+        customerId: targetCustomerId,
+        workerId: targetWorkerId,
+        serviceId: service_id || 1,
+        scheduledDate: scheduled_date,
+        startTime: start_time,
+        durationMin: duration_min,
+        address: address || customer.address || "Coimbatore, Tamil Nadu",
+        description,
+        isEmergency: is_emergency
+      });
+    } catch (dbErr: any) {
+      console.warn("Direct Supabase booking creation failed, falling back to in-memory:", dbErr.message);
+      const basePrice = svc ? svc.base_price : 350;
+      const workerWage = svc ? svc.worker_earning : Math.round(basePrice * 0.9);
+      const coopFee = svc ? svc.coop_charge : (basePrice - workerWage);
 
-    dbStore.bookings.push(newBooking);
+      const newBookingId = ++dbStore.bookingCounter;
+      createdBooking = {
+        id: newBookingId,
+        customer_id: targetCustomerId,
+        worker_id: targetWorkerId,
+        service_id,
+        scheduled_date,
+        start_time,
+        duration_min,
+        lat,
+        lng,
+        address: address || customer.address || "Coimbatore, Tamil Nadu",
+        description,
+        status: "REQUESTED",
+        is_emergency,
+        service_amount: workerWage,
+        coop_charge: coopFee,
+        total_amount: basePrice,
+        created_at: new Date().toISOString()
+      };
+      dbStore.bookings.push(createdBooking);
+    }
 
     // Add notification for worker
     dbStore.notifications.push({
       id: dbStore.notifications.length + 1,
       user_id: worker.id,
       title: "New Service Booking Request",
-      body: `New booking #${newBooking.id} requested for ${newBooking.scheduled_date} at ${newBooking.start_time}.`,
+      body: `New booking #${createdBooking.id} requested for ${createdBooking.scheduled_date} at ${createdBooking.start_time}.`,
       is_read: false,
       created_at: new Date().toISOString()
     });
 
     return NextResponse.json({
-      id: newBooking.id,
-      status: newBooking.status,
-      scheduled_date: newBooking.scheduled_date,
-      start_time: newBooking.start_time,
-      duration_min: newBooking.duration_min,
-      total_amount: newBooking.total_amount,
+      id: createdBooking.id,
+      status: createdBooking.status,
+      scheduled_date: createdBooking.scheduled_date,
+      start_time: createdBooking.start_time,
+      duration_min: createdBooking.duration_min,
+      total_amount: createdBooking.total_amount,
       worker_name: worker.name,
       service_name: svc ? svc.name : "Cooperative Trade Service"
     });

@@ -10,20 +10,31 @@ export interface LocationItem {
 }
 
 export const SERVICE_LOCATIONS: LocationItem[] = [
-  // --- Coimbatore ---
+  // --- Coimbatore (High Precision Cooperative Grid) ---
   { id: "cbe-1", area: "Gandhipuram", city: "Coimbatore", state: "Tamil Nadu", name: "Gandhipuram, Coimbatore", lat: 11.0168, lng: 76.9558, isPopular: true },
   { id: "cbe-2", area: "RS Puram", city: "Coimbatore", state: "Tamil Nadu", name: "RS Puram, Coimbatore", lat: 11.0180, lng: 76.9400, isPopular: true },
   { id: "cbe-3", area: "Peelamedu", city: "Coimbatore", state: "Tamil Nadu", name: "Peelamedu, Coimbatore", lat: 11.0240, lng: 77.0020, isPopular: true },
   { id: "cbe-4", area: "Saibaba Colony", city: "Coimbatore", state: "Tamil Nadu", name: "Saibaba Colony, Coimbatore", lat: 11.0310, lng: 76.9420, isPopular: true },
-  { id: "cbe-5", area: "Singanallur", city: "Coimbatore", state: "Tamil Nadu", name: "Singanallur, Coimbatore", lat: 11.0020, lng: 77.0250 },
+  { id: "cbe-5", area: "Singanallur", city: "Coimbatore", state: "Tamil Nadu", name: "Singanallur, Coimbatore", lat: 11.0020, lng: 77.0250, isPopular: true },
   { id: "cbe-6", area: "Saravanampatti", city: "Coimbatore", state: "Tamil Nadu", name: "Saravanampatti, Coimbatore", lat: 11.0797, lng: 76.9997, isPopular: true },
-  { id: "cbe-7", area: "Ramanathapuram", city: "Coimbatore", state: "Tamil Nadu", name: "Ramanathapuram, Coimbatore", lat: 10.9995, lng: 76.9850 },
-  { id: "cbe-8", area: "Hopes College", city: "Coimbatore", state: "Tamil Nadu", name: "Hopes College, Coimbatore", lat: 11.0280, lng: 77.0140 },
+  { id: "cbe-7", area: "Ramanathapuram", city: "Coimbatore", state: "Tamil Nadu", name: "Ramanathapuram, Coimbatore", lat: 10.9995, lng: 76.9850, isPopular: true },
+  { id: "cbe-8", area: "Hopes College", city: "Coimbatore", state: "Tamil Nadu", name: "Hopes College, Coimbatore", lat: 11.0280, lng: 77.0140, isPopular: true },
   { id: "cbe-9", area: "Vadavalli", city: "Coimbatore", state: "Tamil Nadu", name: "Vadavalli, Coimbatore", lat: 11.0280, lng: 76.9020 },
   { id: "cbe-10", area: "Thudiyalur", city: "Coimbatore", state: "Tamil Nadu", name: "Thudiyalur, Coimbatore", lat: 11.0800, lng: 76.9380 },
   { id: "cbe-11", area: "Kovaipudur", city: "Coimbatore", state: "Tamil Nadu", name: "Kovaipudur, Coimbatore", lat: 10.9380, lng: 76.9400 },
   { id: "cbe-12", area: "Ukkadam", city: "Coimbatore", state: "Tamil Nadu", name: "Ukkadam, Coimbatore", lat: 10.9920, lng: 76.9600 },
-  { id: "cbe-13", area: "Pollachi", city: "Coimbatore", state: "Tamil Nadu", name: "Pollachi, Coimbatore", lat: 10.6580, lng: 77.0080 },
+  { id: "cbe-13", area: "Ganapathy", city: "Coimbatore", state: "Tamil Nadu", name: "Ganapathy, Coimbatore", lat: 11.0370, lng: 76.9730, isPopular: true },
+  { id: "cbe-14", area: "Kuniyamuthur", city: "Coimbatore", state: "Tamil Nadu", name: "Kuniyamuthur, Coimbatore", lat: 10.9630, lng: 76.9450 },
+  { id: "cbe-15", area: "Ondipudur", city: "Coimbatore", state: "Tamil Nadu", name: "Ondipudur, Coimbatore", lat: 11.0040, lng: 77.0540 },
+  { id: "cbe-16", area: "Sundarapuram", city: "Coimbatore", state: "Tamil Nadu", name: "Sundarapuram, Coimbatore", lat: 10.9520, lng: 76.9720 },
+  { id: "cbe-17", area: "Goldwins / SITRA", city: "Coimbatore", state: "Tamil Nadu", name: "Goldwins / SITRA, Coimbatore", lat: 11.0350, lng: 77.0420 },
+  { id: "cbe-18", area: "Race Course", city: "Coimbatore", state: "Tamil Nadu", name: "Race Course, Coimbatore", lat: 11.0060, lng: 76.9720, isPopular: true },
+  { id: "cbe-19", area: "Ram Nagar", city: "Coimbatore", state: "Tamil Nadu", name: "Ram Nagar, Coimbatore", lat: 11.0185, lng: 76.9610 },
+  { id: "cbe-20", area: "Kalapatti", city: "Coimbatore", state: "Tamil Nadu", name: "Kalapatti, Coimbatore", lat: 11.0710, lng: 77.0340 },
+  { id: "cbe-21", area: "Podanur", city: "Coimbatore", state: "Tamil Nadu", name: "Podanur, Coimbatore", lat: 10.9660, lng: 76.9940 },
+  { id: "cbe-22", area: "Pappanaickenpalayam", city: "Coimbatore", state: "Tamil Nadu", name: "Pappanaickenpalayam, Coimbatore", lat: 11.0120, lng: 76.9780 },
+  { id: "cbe-23", area: "Town Hall", city: "Coimbatore", state: "Tamil Nadu", name: "Town Hall, Coimbatore", lat: 10.9980, lng: 76.9620 },
+  { id: "cbe-24", area: "Pollachi", city: "Coimbatore", state: "Tamil Nadu", name: "Pollachi, Coimbatore", lat: 10.6580, lng: 77.0080 },
 
   // --- Chennai ---
   { id: "chn-1", area: "T. Nagar", city: "Chennai", state: "Tamil Nadu", name: "T. Nagar, Chennai", lat: 13.0418, lng: 80.2341, isPopular: true },
@@ -136,3 +147,311 @@ export function searchLocations(query: string, cityFilter: string = "All"): Loca
     );
   });
 }
+
+/**
+ * Calculate distance in kilometers between two GPS coordinates using Haversine formula
+ */
+export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+/**
+ * Finds the nearest cooperative service location for given GPS coordinates
+ */
+export function findNearestLocation(lat: number, lng: number): LocationItem {
+  let nearest: LocationItem = DEFAULT_LOCATION;
+  let minDistance = Infinity;
+
+  for (const loc of SERVICE_LOCATIONS) {
+    const dist = calculateDistanceKm(lat, lng, loc.lat, loc.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = loc;
+    }
+  }
+
+  return nearest;
+}
+
+export interface GpsExtractionResult {
+  address: string;
+  location: LocationItem;
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  road?: string;
+  suburb?: string;
+  city?: string;
+  postcode?: string;
+}
+
+/**
+ * Local storage key and custom event name for synchronized GPS location
+ */
+export const LOCATION_STORAGE_KEY = "ondemand_customer_gps_location";
+export const LOCATION_UPDATED_EVENT = "ondemand_location_updated";
+
+/**
+ * Retrieve cached GPS location result from localStorage if available
+ */
+export function getStoredLocation(): GpsExtractionResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LOCATION_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save GPS location to localStorage and broadcast change to other components
+ */
+export function setStoredLocation(result: GpsExtractionResult): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(result));
+    window.dispatchEvent(new CustomEvent(LOCATION_UPDATED_EVENT, { detail: result }));
+  } catch (e) {
+    console.warn("Could not cache location:", e);
+  }
+}
+
+/**
+ * High-precision reverse geocoding from GPS coordinates into detailed street, building, colony, and city.
+ * Combines OpenStreetMap (zoom=18 building level) and BigDataCloud for maximum accuracy and zero rate-limiting.
+ */
+export async function reverseGeocodeGps(lat: number, lng: number, accuracy?: number): Promise<GpsExtractionResult> {
+  const nearestLoc = findNearestLocation(lat, lng);
+
+  // Strategy 1: OpenStreetMap Nominatim with zoom 18 for building/street-level detail
+  const fetchNominatim = async (): Promise<GpsExtractionResult | null> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            "Accept-Language": "en, ta",
+            "User-Agent": "OnDemandLabourCooperative/2.0 (Verified Service; SIH)"
+          },
+          signal: controller.signal
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        
+        const houseNumber = addr.house_number || addr.house_name || "";
+        const building = addr.building || addr.amenity || addr.shop || "";
+        const road = addr.road || addr.street || addr.residential || addr.pedestrian || addr.footway || "";
+        const neighbourhood = addr.neighbourhood || addr.subdistrict || addr.quarter || "";
+        const suburb = addr.suburb || addr.locality || neighbourhood || nearestLoc.area;
+        const city = addr.city || addr.town || addr.municipality || addr.county || nearestLoc.city;
+        const state = addr.state || nearestLoc.state;
+        const postcode = addr.postcode ? ` - ${addr.postcode}` : "";
+
+        const parts: string[] = [];
+        if (houseNumber && road) {
+          parts.push(`${houseNumber}, ${road}`);
+        } else if (building && road) {
+          parts.push(`${building}, ${road}`);
+        } else if (road) {
+          parts.push(road);
+        } else if (building) {
+          parts.push(building);
+        }
+
+        if (neighbourhood && !parts.includes(neighbourhood) && neighbourhood !== suburb) {
+          parts.push(neighbourhood);
+        }
+        if (suburb && !parts.includes(suburb)) {
+          parts.push(suburb);
+        }
+        if (city && !parts.includes(city)) {
+          parts.push(city);
+        }
+
+        const formattedAddress = parts.length > 0 ? `${parts.join(", ")}${postcode}` : (data.display_name || `${nearestLoc.area}, ${nearestLoc.city}`);
+
+        const customLoc: LocationItem = {
+          id: `gps-${Date.now()}`,
+          area: suburb || nearestLoc.area,
+          city: city || nearestLoc.city,
+          state: state || nearestLoc.state,
+          name: `${suburb || nearestLoc.area}, ${city || nearestLoc.city}`,
+          lat,
+          lng
+        };
+
+        return {
+          address: formattedAddress,
+          location: customLoc,
+          lat,
+          lng,
+          accuracy,
+          road,
+          suburb,
+          city,
+          postcode: addr.postcode
+        };
+      }
+    } catch {
+      // Ignore and fallback
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    return null;
+  };
+
+  // Strategy 2: BigDataCloud Client Reverse Geocoding API (fast, reliable sub-locality resolution)
+  const fetchBigDataCloud = async (): Promise<GpsExtractionResult | null> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    try {
+      const res = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const locality = data.locality || data.subLocality || nearestLoc.area;
+        const city = data.city || nearestLoc.city;
+        const state = data.principalSubdivision || nearestLoc.state;
+        const postcode = data.postcode ? ` - ${data.postcode}` : "";
+
+        // Look for informative street/road in localityInfo
+        const info = Array.isArray(data.localityInfo?.informative) ? data.localityInfo.informative : [];
+        const streetOrRoad = info.find((i: any) => 
+          i.description?.toLowerCase().includes("road") || 
+          i.description?.toLowerCase().includes("street") ||
+          i.name?.toLowerCase().includes("road") ||
+          i.name?.toLowerCase().includes("street")
+        )?.name || "";
+
+        const parts: string[] = [];
+        if (streetOrRoad) parts.push(streetOrRoad);
+        if (locality && !parts.includes(locality)) parts.push(locality);
+        if (city && !parts.includes(city)) parts.push(city);
+
+        const formattedAddress = parts.length > 0 ? `${parts.join(", ")}${postcode}` : `${locality}, ${city}${postcode}`;
+
+        const customLoc: LocationItem = {
+          id: `gps-${Date.now()}`,
+          area: locality,
+          city,
+          state,
+          name: `${locality}, ${city}`,
+          lat,
+          lng
+        };
+
+        return {
+          address: formattedAddress,
+          location: customLoc,
+          lat,
+          lng,
+          accuracy,
+          suburb: locality,
+          city,
+          postcode: data.postcode
+        };
+      }
+    } catch {
+      // Ignore
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    return null;
+  };
+
+  // Execute both in parallel for maximum speed and accuracy
+  try {
+    const [nominatimResult, bdcResult] = await Promise.allSettled([
+      fetchNominatim(),
+      fetchBigDataCloud()
+    ]);
+
+    if (nominatimResult.status === "fulfilled" && nominatimResult.value) {
+      setStoredLocation(nominatimResult.value);
+      return nominatimResult.value;
+    }
+
+    if (bdcResult.status === "fulfilled" && bdcResult.value) {
+      setStoredLocation(bdcResult.value);
+      return bdcResult.value;
+    }
+  } catch (e) {
+    console.warn("Dual geocoder warning:", e);
+  }
+
+  // Fallback to nearest cooperative node
+  const fallbackResult: GpsExtractionResult = {
+    address: `${nearestLoc.name}, Tamil Nadu`,
+    location: {
+      ...nearestLoc,
+      lat,
+      lng
+    },
+    lat,
+    lng,
+    accuracy,
+    suburb: nearestLoc.area,
+    city: nearestLoc.city
+  };
+
+  setStoredLocation(fallbackResult);
+  return fallbackResult;
+}
+
+/**
+ * Fast GPS extraction helper with fresh hardware accuracy (maximumAge: 0) and automatic fallback
+ */
+export function extractFastGps(options?: PositionOptions): Promise<GpsExtractionResult> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by your browser"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude, accuracy } = pos.coords;
+          const result = await reverseGeocodeGps(latitude, longitude, Math.round(accuracy));
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      },
+      (err) => {
+        reject(err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 0, // CRITICAL: zero maximumAge forces fresh real-time satellite GPS hardware fix!
+        ...options,
+      }
+    );
+  });
+}
+

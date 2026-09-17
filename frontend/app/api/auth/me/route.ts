@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     if (user.role === "CUSTOMER") {
       res.customer_id = user.customer_id || user.id;
       res.address = user.address || "Coimbatore";
+      res.avatar_url = user.avatar_url || "";
     } else if (user.role === "WORKER") {
       res.worker_id = user.worker_id || user.id;
       res.verification_status = user.verification_status || "VERIFIED";
@@ -37,6 +38,11 @@ export async function GET(req: NextRequest) {
       res.avg_rating = user.avg_rating || 4.8;
       res.rating_count = user.rating_count || 10;
       res.experience_years = user.experience_years || 5.0;
+      res.address = user.address || "Coimbatore";
+      res.avatar_url = user.avatar_url || "";
+      res.bio = user.bio || "";
+      res.upi_id = user.upi_id || "";
+      res.upi_qr_url = user.upi_qr_url || "";
     }
 
     return NextResponse.json(res);

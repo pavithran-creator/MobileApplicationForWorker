@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLang } from "../lib/i18n";
 import { getAuthToken, clearAuthToken, request, getCurrentUser, setCurrentUser } from "../lib/api";
+import { getStoredLocation, extractFastGps, LOCATION_UPDATED_EVENT, DEFAULT_LOCATION } from "../lib/locations";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -12,6 +13,33 @@ export default function Navbar() {
   const { lang, setLang, t } = useLang();
   const [user, setUser] = useState<{ name: string; role: string } | null>(() => getCurrentUser());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeLocName, setActiveLocName] = useState<string>(() => {
+    const cached = getStoredLocation();
+    return cached?.location?.name || DEFAULT_LOCATION.name;
+  });
+  const [detectingGps, setDetectingGps] = useState(false);
+
+  useEffect(() => {
+    const handleLocUpdate = (e: any) => {
+      if (e.detail?.location?.name) {
+        setActiveLocName(e.detail.location.name);
+      }
+    };
+    window.addEventListener(LOCATION_UPDATED_EVENT, handleLocUpdate);
+    return () => window.removeEventListener(LOCATION_UPDATED_EVENT, handleLocUpdate);
+  }, []);
+
+  const handleQuickGps = async () => {
+    setDetectingGps(true);
+    try {
+      const res = await extractFastGps();
+      setActiveLocName(res.location.name);
+    } catch (err) {
+      console.warn("GPS extraction error in navbar:", err);
+    } finally {
+      setDetectingGps(false);
+    }
+  };
 
   useEffect(() => {
     const cached = getCurrentUser();
@@ -94,6 +122,26 @@ export default function Navbar() {
                 </span>
               </div>
             </Link>
+
+            {/* Fast GPS Location Pill */}
+            <button
+              type="button"
+              onClick={handleQuickGps}
+              disabled={detectingGps}
+              title="Fast GPS location - Click to refresh"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 hover:bg-emerald-950 border border-emerald-700/60 text-[11px] text-emerald-100 transition-all cursor-pointer shadow-2xs ml-1"
+            >
+              <span className={`w-2 h-2 rounded-full ${detectingGps ? "bg-amber-400 animate-ping" : "bg-emerald-400"}`}></span>
+              <svg className="w-3.5 h-3.5 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              <span className="font-semibold max-w-[130px] truncate">
+                {detectingGps ? "Extracting GPS..." : activeLocName}
+              </span>
+              <span className="text-[9px] bg-emerald-800 text-emerald-200 px-1 py-0.2 rounded font-bold uppercase">
+                GPS
+              </span>
+            </button>
           </div>
 
           {/* Desktop Navigation Links */}
@@ -194,6 +242,23 @@ export default function Navbar() {
       {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-emerald-800 bg-emerald-950 px-4 pt-2 pb-4 space-y-1">
+          {/* Mobile GPS Location Button */}
+          <button
+            type="button"
+            onClick={() => {
+              handleQuickGps();
+            }}
+            disabled={detectingGps}
+            className="w-full mb-2 flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-900 border border-emerald-700/80 text-xs text-emerald-100 font-medium"
+          >
+            <span className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${detectingGps ? "bg-amber-400 animate-ping" : "bg-emerald-400"}`}></span>
+              <span className="truncate">📍 {detectingGps ? "Extracting GPS..." : activeLocName}</span>
+            </span>
+            <span className="text-[10px] bg-emerald-800 px-1.5 py-0.5 rounded font-bold uppercase text-emerald-200">
+              Refresh GPS
+            </span>
+          </button>
           {navLinks.map((item) => (
             <Link
               key={item.href}

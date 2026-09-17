@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     password_hash VARCHAR(255),
     role user_role NOT NULL DEFAULT 'CUSTOMER',
     is_active BOOLEAN DEFAULT TRUE,
+    avatar_url TEXT DEFAULT '',
+    bio TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -97,6 +99,10 @@ CREATE TABLE IF NOT EXISTS public.workers (
     base_lat DOUBLE PRECISION DEFAULT 11.0168,
     base_lng DOUBLE PRECISION DEFAULT 76.9558,
     service_radius_km DOUBLE PRECISION DEFAULT 15.0,
+    avatar_url TEXT DEFAULT '',
+    bio TEXT DEFAULT '',
+    upi_id VARCHAR(100) DEFAULT '',
+    upi_qr_url TEXT DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

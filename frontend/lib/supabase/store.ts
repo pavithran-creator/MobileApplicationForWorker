@@ -18,6 +18,10 @@ export interface DBUser {
   skills?: string[];
   cooperative?: string;
   is_available?: boolean;
+  avatar_url?: string;
+  bio?: string;
+  upi_id?: string;
+  upi_qr_url?: string;
 }
 
 export interface DBCoop {
@@ -211,26 +215,216 @@ function initStore() {
       { id: 7, customer_id: 4, name: "Kavitha Mohan", phone: "9000000014", email: "kavitha@example.com", role: "CUSTOMER", address: "102 Mettupalayam Road, Saibaba Colony, Coimbatore" },
 
       // Verified Workers
-      { id: 8, worker_id: 1, name: "Suresh Kumar", phone: "9010000001", role: "WORKER", cooperative_id: 1, cooperative: "Gandhipuram Labour Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 42, experience_years: 8.5, skills: ["Electrical repair", "Domestic wiring"], address: "Gandhipuram, Coimbatore" },
-      { id: 9, worker_id: 2, name: "Kannan Raj", phone: "9010000002", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 28, experience_years: 6.5, skills: ["Domestic wiring", "Electrical repair"], address: "RS Puram, Coimbatore" },
-      { id: 10, worker_id: 3, name: "Murugan Vel", phone: "9010000003", role: "WORKER", cooperative_id: 1, cooperative: "Gandhipuram Labour Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 55, experience_years: 9.0, skills: ["Pipe repair", "Bathroom plumbing"], address: "Gandhipuram, Coimbatore" },
-      { id: 11, worker_id: 4, name: "Selvi Mani", phone: "9010000004", role: "WORKER", cooperative_id: 1, cooperative: "Gandhipuram Labour Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 48, experience_years: 5.0, skills: ["Home cleaning"], address: "Gandhipuram, Coimbatore" },
-      { id: 12, worker_id: 5, name: "Raju Pillai", phone: "9010000005", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 64, experience_years: 11.0, skills: ["Woodwork"], address: "RS Puram, Coimbatore" },
-      { id: 13, worker_id: 6, name: "Divya Lakshmi", phone: "9010000006", role: "WORKER", cooperative_id: 1, cooperative: "Gandhipuram Labour Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 5.0, rating_count: 27, experience_years: 5.5, skills: ["Elderly assistance"], address: "Gandhipuram, Coimbatore" },
-      { id: 14, worker_id: 7, name: "Kumar Swamy", phone: "9010000007", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.7, rating_count: 36, experience_years: 7.5, skills: ["Car driving"], address: "Peelamedu, Coimbatore" },
-      { id: 15, worker_id: 8, name: "Anbu Selvan", phone: "9010000008", role: "WORKER", cooperative_id: 1, cooperative: "Gandhipuram Labour Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 29, experience_years: 6.5, skills: ["House painting"], address: "Gandhipuram, Coimbatore" },
-      { id: 16, worker_id: 9, name: "Velu Chettiar", phone: "9010000009", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 33, experience_years: 7.5, skills: ["Lawn maintenance"], address: "RS Puram, Coimbatore" },
-      { id: 17, worker_id: 10, name: "Priya Balan", phone: "9010000010", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 24, experience_years: 5.5, skills: ["Bathroom plumbing", "Pipe repair"], address: "RS Puram, Coimbatore" },
-      { id: 18, worker_id: 11, name: "Senthil Nathan", phone: "9010000011", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 31, experience_years: 7.0, skills: ["Electrical repair", "Domestic wiring"], address: "Peelamedu, Coimbatore" },
-      { id: 19, worker_id: 12, name: "Mani Kandan", phone: "9010000012", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.7, rating_count: 30, experience_years: 6.0, skills: ["Pipe repair", "Bathroom plumbing"], address: "Saibaba Colony, Coimbatore" },
-      { id: 20, worker_id: 13, name: "Arul Dass", phone: "9010000013", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 38, experience_years: 8.0, skills: ["Woodwork"], address: "Singanallur, Coimbatore" },
-      { id: 21, worker_id: 14, name: "Karthik Raja", phone: "9010000014", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 41, experience_years: 8.0, skills: ["House painting"], address: "Peelamedu, Coimbatore" },
-      { id: 22, worker_id: 15, name: "Vignesh Kumar", phone: "9010000015", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 25, experience_years: 6.0, skills: ["Car driving"], address: "Singanallur, Coimbatore" },
-      { id: 23, worker_id: 16, name: "Lakshmi Ammal", phone: "9010000016", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 39, experience_years: 7.0, skills: ["Home cleaning"], address: "Saibaba Colony, Coimbatore" },
-      { id: 24, worker_id: 17, name: "Subramani M", phone: "9010000017", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.7, rating_count: 21, experience_years: 6.0, skills: ["Lawn maintenance"], address: "Singanallur, Coimbatore" },
-      { id: 25, worker_id: 18, name: "Revathi Sundaram", phone: "9010000018", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 35, experience_years: 8.0, skills: ["Elderly assistance"], address: "Peelamedu, Coimbatore" },
-      { id: 26, worker_id: 19, name: "Saravanan P", phone: "9010000019", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "PENDING", is_available: true, avg_rating: 0.0, rating_count: 0, experience_years: 3.0, skills: ["Electrical repair"], address: "RS Puram, Coimbatore" },
-      { id: 27, worker_id: 20, name: "Balamurugan K", phone: "9010000020", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "UNDER_REVIEW", is_available: true, avg_rating: 0.0, rating_count: 0, experience_years: 2.5, skills: ["Pipe repair"], address: "Saibaba Colony, Coimbatore" },
+      {
+        id: 8,
+        worker_id: 1,
+        name: "Suresh Kumar",
+        phone: "9010000001",
+        role: "WORKER",
+        cooperative_id: 1,
+        cooperative: "Gandhipuram Labour Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.9,
+        rating_count: 42,
+        experience_years: 8.5,
+        skills: ["Electrical repair", "Domestic wiring"],
+        address: "Gandhipuram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=300&q=80",
+        bio: "Senior certified electrician with 8+ years experience in domestic wiring, 3-phase systems, and fault diagnosis. Committed to transparent cooperative rates.",
+        upi_id: "suresh.electrician@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=suresh.electrician@oksbi&pn=Suresh%20Kumar&cu=INR"
+      },
+      {
+        id: 9,
+        worker_id: 2,
+        name: "Kannan Raj",
+        phone: "9010000002",
+        role: "WORKER",
+        cooperative_id: 2,
+        cooperative: "RS Puram Workers Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.8,
+        rating_count: 28,
+        experience_years: 6.5,
+        skills: ["Domestic wiring", "Electrical repair"],
+        address: "RS Puram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
+        bio: "Specialized in energy audits, circuit safety tests, and domestic lighting setups. Prompt on-site arrival guaranteed.",
+        upi_id: "kannan.raj@apl",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=kannan.raj@apl&pn=Kannan%20Raj&cu=INR"
+      },
+      {
+        id: 10,
+        worker_id: 3,
+        name: "Murugan Vel",
+        phone: "9010000003",
+        role: "WORKER",
+        cooperative_id: 1,
+        cooperative: "Gandhipuram Labour Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.8,
+        rating_count: 55,
+        experience_years: 9.0,
+        skills: ["Pipe repair", "Bathroom plumbing"],
+        address: "Gandhipuram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
+        bio: "Master plumber covering leak detection, sanitary fixture overhauls, and drainage repairs. High precision work with standard cooperative warranty.",
+        upi_id: "murugan.plumber@paytm",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=murugan.plumber@paytm&pn=Murugan%20Vel&cu=INR"
+      },
+      {
+        id: 11,
+        worker_id: 4,
+        name: "Selvi Mani",
+        phone: "9010000004",
+        role: "WORKER",
+        cooperative_id: 1,
+        cooperative: "Gandhipuram Labour Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.9,
+        rating_count: 48,
+        experience_years: 5.0,
+        skills: ["Home cleaning"],
+        address: "Gandhipuram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80",
+        bio: "Expert in deep sanitization, kitchen degreasing, and eco-friendly home care. Dedicated cooperative member with high client satisfaction.",
+        upi_id: "selvi.cleaner@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=selvi.cleaner@oksbi&pn=Selvi%20Mani&cu=INR"
+      },
+      {
+        id: 12,
+        worker_id: 5,
+        name: "Raju Pillai",
+        phone: "9010000005",
+        role: "WORKER",
+        cooperative_id: 2,
+        cooperative: "RS Puram Workers Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.8,
+        rating_count: 64,
+        experience_years: 11.0,
+        skills: ["Woodwork"],
+        address: "RS Puram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80",
+        bio: "Skilled carpenter with 11+ years of experience in furniture restoration, door hinge alignment, and modular fittings.",
+        upi_id: "raju.carpenter@icici",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=raju.carpenter@icici&pn=Raju%20Pillai&cu=INR"
+      },
+      {
+        id: 13,
+        worker_id: 6,
+        name: "Divya Lakshmi",
+        phone: "9010000006",
+        role: "WORKER",
+        cooperative_id: 1,
+        cooperative: "Gandhipuram Labour Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 5.0,
+        rating_count: 27,
+        experience_years: 5.5,
+        skills: ["Elderly assistance"],
+        address: "Gandhipuram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80",
+        bio: "Trained compassionate healthcare assistant offering mobility support and companionship for senior citizens.",
+        upi_id: "divya.care@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=divya.care@oksbi&pn=Divya%20Lakshmi&cu=INR"
+      },
+      {
+        id: 14,
+        worker_id: 7,
+        name: "Kumar Swamy",
+        phone: "9010000007",
+        role: "WORKER",
+        cooperative_id: 3,
+        cooperative: "Peelamedu Seva Labour Cooperative",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.7,
+        rating_count: 36,
+        experience_years: 7.5,
+        skills: ["Car driving"],
+        address: "Peelamedu, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=300&q=80",
+        bio: "Commercial badge driver with safe driving record across Tamil Nadu highways and city routes. Punctual and polite.",
+        upi_id: "kumar.driver@barodampay",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=kumar.driver@barodampay&pn=Kumar%20Swamy&cu=INR"
+      },
+      {
+        id: 15,
+        worker_id: 8,
+        name: "Anbu Selvan",
+        phone: "9010000008",
+        role: "WORKER",
+        cooperative_id: 1,
+        cooperative: "Gandhipuram Labour Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.8,
+        rating_count: 29,
+        experience_years: 6.5,
+        skills: ["House painting"],
+        address: "Gandhipuram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=300&q=80",
+        bio: "Professional painter specialized in interior surface preparation, primer coating, and waterproof exterior finishes.",
+        upi_id: "anbu.painter@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=anbu.painter@oksbi&pn=Anbu%20Selvan&cu=INR"
+      },
+      {
+        id: 16,
+        worker_id: 9,
+        name: "Velu Chettiar",
+        phone: "9010000009",
+        role: "WORKER",
+        cooperative_id: 2,
+        cooperative: "RS Puram Workers Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.8,
+        rating_count: 33,
+        experience_years: 7.5,
+        skills: ["Lawn maintenance"],
+        address: "RS Puram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80",
+        bio: "Landscaping and garden maintenance expert. Tree pruning, turf revitalization, and seasonal plant nourishment.",
+        upi_id: "velu.gardener@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=velu.gardener@oksbi&pn=Velu%20Chettiar&cu=INR"
+      },
+      {
+        id: 17,
+        worker_id: 10,
+        name: "Priya Balan",
+        phone: "9010000010",
+        role: "WORKER",
+        cooperative_id: 2,
+        cooperative: "RS Puram Workers Cooperative Society",
+        verification_status: "VERIFIED",
+        is_available: true,
+        avg_rating: 4.9,
+        rating_count: 24,
+        experience_years: 5.5,
+        skills: ["Bathroom plumbing", "Pipe repair"],
+        address: "RS Puram, Coimbatore",
+        avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+        bio: "Certified plumbing technician for residential water supply installations, motor pump issues, and solar heater connections.",
+        upi_id: "priya.plumber@oksbi",
+        upi_qr_url: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=priya.plumber@oksbi&pn=Priya%20Balan&cu=INR"
+      },
+      { id: 18, worker_id: 11, name: "Senthil Nathan", phone: "9010000011", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 31, experience_years: 7.0, skills: ["Electrical repair", "Domestic wiring"], address: "Peelamedu, Coimbatore", upi_id: "senthil@oksbi" },
+      { id: 19, worker_id: 12, name: "Mani Kandan", phone: "9010000012", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.7, rating_count: 30, experience_years: 6.0, skills: ["Pipe repair", "Bathroom plumbing"], address: "Saibaba Colony, Coimbatore", upi_id: "mani@oksbi" },
+      { id: 20, worker_id: 13, name: "Arul Dass", phone: "9010000013", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 38, experience_years: 8.0, skills: ["Woodwork"], address: "Singanallur, Coimbatore", upi_id: "arul@oksbi" },
+      { id: 21, worker_id: 14, name: "Karthik Raja", phone: "9010000014", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 41, experience_years: 8.0, skills: ["House painting"], address: "Peelamedu, Coimbatore", upi_id: "karthik@oksbi" },
+      { id: 22, worker_id: 15, name: "Vignesh Kumar", phone: "9010000015", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.8, rating_count: 25, experience_years: 6.0, skills: ["Car driving"], address: "Singanallur, Coimbatore", upi_id: "vignesh@oksbi" },
+      { id: 23, worker_id: 16, name: "Lakshmi Ammal", phone: "9010000016", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 39, experience_years: 7.0, skills: ["Home cleaning"], address: "Saibaba Colony, Coimbatore", upi_id: "lakshmi@oksbi" },
+      { id: 24, worker_id: 17, name: "Subramani M", phone: "9010000017", role: "WORKER", cooperative_id: 5, cooperative: "Singanallur Artisan Cooperative Society", verification_status: "VERIFIED", is_available: true, avg_rating: 4.7, rating_count: 21, experience_years: 6.0, skills: ["Lawn maintenance"], address: "Singanallur, Coimbatore", upi_id: "subramani@oksbi" },
+      { id: 25, worker_id: 18, name: "Revathi Sundaram", phone: "9010000018", role: "WORKER", cooperative_id: 3, cooperative: "Peelamedu Seva Labour Cooperative", verification_status: "VERIFIED", is_available: true, avg_rating: 4.9, rating_count: 35, experience_years: 8.0, skills: ["Elderly assistance"], address: "Peelamedu, Coimbatore", upi_id: "revathi@oksbi" },
+      { id: 26, worker_id: 19, name: "Saravanan P", phone: "9010000019", role: "WORKER", cooperative_id: 2, cooperative: "RS Puram Workers Cooperative Society", verification_status: "PENDING", is_available: true, avg_rating: 0.0, rating_count: 0, experience_years: 3.0, skills: ["Electrical repair"], address: "RS Puram, Coimbatore", upi_id: "saravanan@oksbi" },
+      { id: 27, worker_id: 20, name: "Balamurugan K", phone: "9010000020", role: "WORKER", cooperative_id: 4, cooperative: "Saibaba Colony Labour Welfare Cooperative", verification_status: "UNDER_REVIEW", is_available: true, avg_rating: 0.0, rating_count: 0, experience_years: 2.5, skills: ["Pipe repair"], address: "Saibaba Colony, Coimbatore", upi_id: "balamurugan@oksbi" },
     ];
 
     // Seed historical bookings across 60 days
@@ -354,6 +548,27 @@ function initStore() {
       userCounter: 100,
     };
   }
+
+  // Ensure worker avatar_url, bio, upi_id, and upi_qr_url are initialized even across hot reloads
+  for (const u of global.__supabase_store__.users) {
+    if (u.role === "WORKER") {
+      if (!u.upi_id) {
+        const handle = u.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        u.upi_id = `${handle || "worker"}@oksbi`;
+      }
+      if (!u.upi_qr_url) {
+        const upiUri = `upi://pay?pa=${encodeURIComponent(u.upi_id)}&pn=${encodeURIComponent(u.name)}&cu=INR`;
+        u.upi_qr_url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
+      }
+      if (!u.bio) {
+        u.bio = `Certified cooperative ${u.skills?.[0] || "trade"} specialist with ${u.experience_years || 5} years experience. Punctual, transparent fair wages guaranteed.`;
+      }
+      if (!u.avatar_url) {
+        u.avatar_url = "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=300&q=80";
+      }
+    }
+  }
+
   return global.__supabase_store__;
 }
 

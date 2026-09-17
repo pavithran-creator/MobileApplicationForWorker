@@ -11,7 +11,8 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 import EmptyState from "../../components/EmptyState";
 import InvoiceModal from "../../components/InvoiceModal";
 import LocationSearchSelect from "../../components/LocationSearchSelect";
-import { LocationItem, SERVICE_LOCATIONS, DEFAULT_LOCATION } from "../../lib/locations";
+import GpsLocationBar from "../../components/GpsLocationBar";
+import { LocationItem, SERVICE_LOCATIONS, DEFAULT_LOCATION, GpsExtractionResult, getStoredLocation, extractFastGps } from "../../lib/locations";
 
 const DEFAULT_SERVICES: ServiceItem[] = [
   { id: 1, name: "Fan & light repair", description: "Professional fan & light repair by verified cooperative tradespersons", base_price: 250, worker_earning: 225, coop_charge: 25, requires_certification: true, category_id: 1 },
@@ -48,9 +49,18 @@ function BookServiceContent() {
     return tomorrow.toISOString().split("T")[0];
   });
   const [startTime, setStartTime] = useState("10:00");
-  const [selectedLocation, setSelectedLocation] = useState<LocationItem>(DEFAULT_LOCATION);
-  const [address, setAddress] = useState("142 Crosscut Road, Gandhipuram, Coimbatore");
+  const [selectedLocation, setSelectedLocation] = useState<LocationItem>(() => {
+    const cached = getStoredLocation();
+    return cached?.location || DEFAULT_LOCATION;
+  });
+  const [address, setAddress] = useState<string>(() => {
+    const cached = getStoredLocation();
+    return cached?.address || DEFAULT_LOCATION.name;
+  });
   const [description, setDescription] = useState("");
+  const [bookingForSelf, setBookingForSelf] = useState(true);
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
 
   // Worker Matching state
   const [loadingWorkers, setLoadingWorkers] = useState(false);
@@ -68,6 +78,9 @@ function BookServiceContent() {
 
   // Audited Statutory Invoice Modal state
   const [viewInvoice, setViewInvoice] = useState<InvoiceRecord | null>(null);
+
+  // Quick View Worker QR state
+  const [previewWorkerQr, setPreviewWorkerQr] = useState<MatchedWorker | null>(null);
 
   const triggerFindWorkers = async (
     serviceId: number,
@@ -99,6 +112,33 @@ function BookServiceContent() {
   useEffect(() => {
     setCurrentUser(getCurrentUser());
 
+    // Check if location was passed in searchParams or cached from fast GPS
+    const cachedLoc = getStoredLocation();
+    let initialLoc = cachedLoc?.location || DEFAULT_LOCATION;
+    let initialAddr = cachedLoc?.address || initialLoc.name;
+
+    const latParam = searchParams.get("lat");
+    const lngParam = searchParams.get("lng");
+    const addrParam = searchParams.get("address");
+
+    if (latParam && lngParam) {
+      const parsedLat = parseFloat(latParam);
+      const parsedLng = parseFloat(lngParam);
+      initialLoc = {
+        id: `param-${Date.now()}`,
+        name: addrParam || `${parsedLat.toFixed(4)}, ${parsedLng.toFixed(4)}`,
+        area: addrParam?.split(",")[0] || "Detected Area",
+        city: "Coimbatore",
+        state: "Tamil Nadu",
+        lat: parsedLat,
+        lng: parsedLng,
+      };
+      initialAddr = addrParam || initialLoc.name;
+    }
+
+    setSelectedLocation(initialLoc);
+    setAddress(initialAddr);
+
     request<ServiceItem[]>("/catalog/services")
       .then((data) => {
         const list = Array.isArray(data) && data.length > 0 ? data : DEFAULT_SERVICES;
@@ -112,12 +152,12 @@ function BookServiceContent() {
           }
         }
         setSelectedServiceId(targetId);
-        triggerFindWorkers(targetId, DEFAULT_LOCATION, scheduledDate, startTime);
+        triggerFindWorkers(targetId, initialLoc, scheduledDate, startTime);
       })
       .catch(() => {
         setServices(DEFAULT_SERVICES);
         setSelectedServiceId(1);
-        triggerFindWorkers(1, DEFAULT_LOCATION, scheduledDate, startTime);
+        triggerFindWorkers(1, initialLoc, scheduledDate, startTime);
       });
   }, [searchParams]);
 
@@ -228,6 +268,10 @@ function BookServiceContent() {
     setBookingError(null);
 
     const loc = selectedLocation || DEFAULT_LOCATION;
+    const finalDescription = !bookingForSelf && (recipientName || recipientPhone)
+      ? `${description ? description + " | " : ""}Booking for: ${recipientName || "Recipient"}${recipientPhone ? ` (Ph: ${recipientPhone})` : ""}`
+      : (description || "Regular cooperative scheduled service");
+
     try {
       const res = await request<any>("/bookings", {
         method: "POST",
@@ -240,7 +284,7 @@ function BookServiceContent() {
           lat: loc.lat,
           lng: loc.lng,
           address: address || loc.name,
-          description: description || "Regular cooperative scheduled service",
+          description: finalDescription,
           is_emergency: false,
         }),
       });
@@ -498,34 +542,131 @@ function BookServiceContent() {
             </div>
           </div>
 
-          {/* Service Area with City & Main Area Search */}
+          {/* Fast GPS Location Extraction & Destination Mode */}
           <div>
-            <LocationSearchSelect
+            <GpsLocationBar
               selectedLocation={selectedLocation}
-              onSelectLocation={(newLoc) => {
-                setSelectedLocation(newLoc);
-                setAddress(newLoc.name);
+              currentAddress={address}
+              bookingForSelf={bookingForSelf}
+              onBookingForSelfChange={(isSelf) => setBookingForSelf(isSelf)}
+              onLocationExtracted={(res) => {
+                setSelectedLocation(res.location);
+                setAddress(res.address);
                 if (selectedServiceId) {
-                  triggerFindWorkers(Number(selectedServiceId), newLoc, scheduledDate, startTime);
+                  triggerFindWorkers(Number(selectedServiceId), res.location, scheduledDate, startTime);
                 }
               }}
-              label={t("book.form_location", "Service Area")}
+              autoExtractOnMount={true}
+              themeColor="emerald"
             />
           </div>
 
-          {/* Detailed Street Address */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              {t("book.form_address", "Door / Street Address")}
-            </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Door No, Street Name, Landmark"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            />
-          </div>
+          {/* Conditional Destination Selection: Booking for Others / Custom Place */}
+          {!bookingForSelf ? (
+            <div className="space-y-3.5 p-4 bg-blue-50/70 rounded-2xl border border-blue-200">
+              <div className="flex items-center gap-2 text-xs font-bold text-blue-950 uppercase tracking-wider">
+                <svg className="w-4 h-4 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                Recipient Destination & Contact
+              </div>
+
+              {/* Destination City & Area Picker for Other Person */}
+              <LocationSearchSelect
+                selectedLocation={selectedLocation}
+                onSelectLocation={(newLoc) => {
+                  setSelectedLocation(newLoc);
+                  setAddress(newLoc.name);
+                  if (selectedServiceId) {
+                    triggerFindWorkers(Number(selectedServiceId), newLoc, scheduledDate, startTime);
+                  }
+                }}
+                onGpsExtracted={(res) => {
+                  setSelectedLocation(res.location);
+                  setAddress(res.address);
+                  setBookingForSelf(true);
+                  if (selectedServiceId) {
+                    triggerFindWorkers(Number(selectedServiceId), res.location, scheduledDate, startTime);
+                  }
+                }}
+                label="Recipient City & Cooperative District"
+                helperText="Dispatch will automatically route to cooperative workers closest to this destination"
+              />
+
+              {/* Recipient Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Recipient Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    placeholder="e.g. Parents / Friend Name"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Recipient Phone (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={recipientPhone}
+                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Recipient Street Address Input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Recipient Door No, Building & Street Address *
+                </label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="e.g. 24 North Car Street, near Temple, Tiruchirappalli"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-white"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Fast GPS Auto-filled Address for Self */
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Service Address (Auto-filled by Fast GPS - Zero typing needed)
+                </label>
+                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  ⚡ GPS Locked
+                </span>
+              </div>
+              <input
+                type="text"
+                value={
+                  address &&
+                  !address.toLowerCase().includes("detecting") &&
+                  !address.toLowerCase().includes("extracting")
+                    ? address
+                    : selectedLocation.name
+                }
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder={selectedLocation.name}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-emerald-300 bg-emerald-50/40 text-slate-900 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Your location has been pinpointed accurately. You don&apos;t need to manually type an address.
+              </p>
+            </div>
+          )}
 
           {/* Specific Task Details */}
           <div>
@@ -589,18 +730,43 @@ function BookServiceContent() {
                   className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-emerald-300 transition-all space-y-4"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-base shadow-sm">
-                        {worker.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-3.5 flex-1">
+                      {worker.avatar_url ? (
+                        <img
+                          src={worker.avatar_url}
+                          alt={worker.name}
+                          className="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-600 shadow-sm shrink-0 bg-slate-100"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                          {worker.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="space-y-1 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-bold text-slate-900">{worker.name}</h3>
                           <StatusBadge type="verification" status="VERIFIED" />
+                          {(worker.upi_qr_url || worker.upi_id) && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewWorkerQr(worker)}
+                              className="text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 transition-colors inline-flex items-center gap-1 shadow-2xs"
+                              title="Click to view worker's direct payment QR"
+                            >
+                              <span>📲</span>
+                              <span>Direct QR</span>
+                            </button>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        <p className="text-xs text-slate-500 font-medium">
                           {worker.cooperative_name} &bull; {worker.experience_years} yrs experience
+                          {worker.address && <span className="text-slate-400"> &bull; 📍 {worker.address}</span>}
                         </p>
+                        {worker.bio && (
+                          <p className="text-xs text-slate-600 italic bg-slate-50 border border-slate-100 p-2 rounded-xl mt-1">
+                            &ldquo;{worker.bio}&rdquo;
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -714,6 +880,80 @@ function BookServiceContent() {
               </div>
             </div>
 
+            {/* WORKER'S DIRECT TRANSACTION QR CODE (Doorstep / Escrow Direct Scan) */}
+            {(() => {
+              const assignedWorker = matchedWorkers.find((w) => w.worker_id === pendingPaymentBooking.worker_id);
+              const workerUpi = assignedWorker?.upi_id || `${pendingPaymentBooking.worker_name.toLowerCase().replace(/\s+/g, '.')}@oksbi`;
+              const qrUrl = assignedWorker?.upi_qr_url || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent('upi://pay?pa=' + workerUpi + '&pn=' + pendingPaymentBooking.worker_name + '&am=' + pendingPaymentBooking.total_amount + '&cu=INR')}`;
+              const workerDirectUpiUrl = `upi://pay?pa=${workerUpi}&pn=${encodeURIComponent(pendingPaymentBooking.worker_name)}&am=${pendingPaymentBooking.total_amount}&tn=Booking_Ref_${pendingPaymentBooking.id}&cu=INR`;
+
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-900 to-slate-900 text-white space-y-3.5 border border-emerald-700/80 shadow-md">
+                  <div className="flex items-center justify-between border-b border-emerald-800/80 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-xs font-bold text-emerald-100 uppercase tracking-wider">
+                        Assigned Worker Transaction QR
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
+                      Scan &amp; Pay Directly
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="w-28 h-28 bg-white p-2 rounded-2xl shrink-0 shadow-lg border-2 border-emerald-400/80 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={qrUrl}
+                        alt="Worker Transaction QR"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 text-xs flex-1 text-center sm:text-left">
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
+                        {assignedWorker?.avatar_url && (
+                          <img
+                            src={assignedWorker.avatar_url}
+                            alt={pendingPaymentBooking.worker_name}
+                            className="w-6 h-6 rounded-full object-cover border border-emerald-400"
+                          />
+                        )}
+                        <span className="font-extrabold text-sm text-emerald-100">
+                          {pendingPaymentBooking.worker_name}
+                        </span>
+                      </div>
+                      <div className="font-mono text-[11px] text-amber-300 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-700/60 inline-block">
+                        UPI: {workerUpi}
+                      </div>
+                      <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+                        Point your mobile camera or GPay, PhonePe, Paytm, or BHIM app to scan and settle ₹{pendingPaymentBooking.total_amount}.
+                      </p>
+                      <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <a
+                          href={workerDirectUpiUrl}
+                          className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-[11px] transition-colors shadow-sm inline-flex items-center gap-1"
+                        >
+                          <span>⚡</span>
+                          <span>Pay Worker UPI</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(workerUpi);
+                            alert("Worker UPI ID copied: " + workerUpi);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-emerald-100 text-[11px] font-medium border border-emerald-600 transition-colors"
+                        >
+                          Copy UPI
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Unified Method: Bank Account & Payment URL */}
             <div className="space-y-3">
               <div className="font-bold text-slate-800 text-xs uppercase tracking-wider">
@@ -800,6 +1040,78 @@ function BookServiceContent() {
                 className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PREVIEW WORKER TRANSACTION QR MODAL */}
+      {previewWorkerQr && (
+        <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-left">
+                {previewWorkerQr.avatar_url ? (
+                  <img
+                    src={previewWorkerQr.avatar_url}
+                    alt={previewWorkerQr.name}
+                    className="w-10 h-10 rounded-xl object-cover border border-emerald-600 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
+                    {previewWorkerQr.name.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-extrabold text-slate-900 font-heading text-sm">
+                    {previewWorkerQr.name}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {previewWorkerQr.cooperative_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewWorkerQr(null)}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 inline-block">
+              <div className="w-52 h-52 bg-white p-2 rounded-xl shadow-md mx-auto flex items-center justify-center overflow-hidden">
+                {previewWorkerQr.upi_qr_url ? (
+                  <img src={previewWorkerQr.upi_qr_url} alt="Transaction QR" className="w-full h-full object-contain" />
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent('upi://pay?pa=' + (previewWorkerQr.upi_id || 'worker@oksbi') + '&pn=' + previewWorkerQr.name + '&cu=INR')}`}
+                    alt="Transaction QR"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs font-bold text-slate-800">Doorstep Transaction QR</div>
+              <div className="font-mono text-xs text-emerald-800 font-bold bg-emerald-50 py-1 px-2.5 rounded-lg border border-emerald-200 inline-block">
+                {previewWorkerQr.upi_id || "suresh.electrician@oksbi"}
+              </div>
+              <p className="text-[11px] text-slate-500 pt-1">
+                Scan with Google Pay, PhonePe, Paytm, or any UPI app to settle directly with this certified tradesperson.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setPreviewWorkerQr(null)}
+                className="w-full py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs transition-colors shadow-sm"
+              >
+                Done
               </button>
             </div>
           </div>

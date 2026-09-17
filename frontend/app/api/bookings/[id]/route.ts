@@ -83,6 +83,13 @@ export async function PATCH(
     const previousStatus = booking.status;
     booking.status = nextStatus;
 
+    try {
+      const { updateBookingStatusInSupabase } = await import("@/lib/supabase/db");
+      await updateBookingStatusInSupabase(bid, nextStatus);
+    } catch (dbErr) {
+      console.warn("Supabase status update warning:", dbErr);
+    }
+
     // Track in audit / notifications if completed
     if (nextStatus === "COMPLETED") {
       dbStore.notifications.push({

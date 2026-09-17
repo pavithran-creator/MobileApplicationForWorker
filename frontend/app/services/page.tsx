@@ -8,6 +8,13 @@ import { ServiceItem, ServiceCategory } from "../../types";
 import StatusBadge from "../../components/StatusBadge";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import EmptyState from "../../components/EmptyState";
+import {
+  LocationItem,
+  DEFAULT_LOCATION,
+  getStoredLocation,
+  extractFastGps,
+  LOCATION_UPDATED_EVENT,
+} from "../../lib/locations";
 
 export default function ServicesPage() {
   const { t } = useLang();
@@ -16,6 +23,44 @@ export default function ServicesPage() {
   const [selectedCat, setSelectedCat] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Fast GPS location state
+  const [activeLocation, setActiveLocation] = useState<LocationItem>(() => {
+    const cached = getStoredLocation();
+    return cached?.location || DEFAULT_LOCATION;
+  });
+  const [activeAddress, setActiveAddress] = useState<string>(() => {
+    const cached = getStoredLocation();
+    return cached?.address || DEFAULT_LOCATION.name;
+  });
+  const [isGpsDetected, setIsGpsDetected] = useState<boolean>(() => !!getStoredLocation());
+  const [detectingGps, setDetectingGps] = useState(false);
+
+  useEffect(() => {
+    const handleLocUpdate = (e: any) => {
+      if (e.detail?.location) {
+        setActiveLocation(e.detail.location);
+        setActiveAddress(e.detail.address);
+        setIsGpsDetected(true);
+      }
+    };
+    window.addEventListener(LOCATION_UPDATED_EVENT, handleLocUpdate);
+    return () => window.removeEventListener(LOCATION_UPDATED_EVENT, handleLocUpdate);
+  }, []);
+
+  const handleDetectGps = async () => {
+    setDetectingGps(true);
+    try {
+      const res = await extractFastGps();
+      setActiveLocation(res.location);
+      setActiveAddress(res.address);
+      setIsGpsDetected(true);
+    } catch (err) {
+      console.warn("GPS extraction error in services:", err);
+    } finally {
+      setDetectingGps(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -82,6 +127,56 @@ export default function ServicesPage() {
             {t("doorstep.trust_2_desc", "Zero surge charges")}
           </span>
         </div>
+      </div>
+
+      {/* Fast GPS Location & Nearby Hub Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div className="overflow-hidden">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Active Service Hub & Nearby Workers:
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                {isGpsDetected ? "⚡ GPS Extracted" : "Cooperative Node"}
+              </span>
+            </div>
+            <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">
+              {activeAddress || activeLocation.name}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDetectGps}
+          disabled={detectingGps}
+          className="px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0 shadow-sm"
+        >
+          {detectingGps ? (
+            <>
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              Extracting GPS...
+            </>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              {isGpsDetected ? "Refresh GPS" : "Extract My GPS"}
+            </>
+          )}
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -185,7 +280,7 @@ export default function ServicesPage() {
 
               <div className="pt-2">
                 <Link
-                  href={`/book?service=${service.id}`}
+                  href={`/book?service=${service.id}&lat=${activeLocation.lat}&lng=${activeLocation.lng}&address=${encodeURIComponent(activeAddress || activeLocation.name)}`}
                   className="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-semibold transition-colors shadow-sm"
                 >
                   {t("services.book_now", "Book Service")} &rarr;

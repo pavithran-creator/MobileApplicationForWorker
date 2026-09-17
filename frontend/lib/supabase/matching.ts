@@ -55,6 +55,11 @@ export interface MatchedWorkerResult {
   rating_count: number;
   experience_years: number;
   reasons: string[];
+  avatar_url?: string;
+  bio?: string;
+  upi_id?: string;
+  upi_qr_url?: string;
+  address?: string;
 }
 
 export function matchWorkers(
@@ -144,7 +149,12 @@ export function matchWorkers(
       avg_rating: w.avg_rating || 4.8,
       rating_count: w.rating_count || 12,
       experience_years: w.experience_years || 5.0,
-      reasons
+      reasons,
+      avatar_url: w.avatar_url,
+      bio: w.bio,
+      upi_id: w.upi_id,
+      upi_qr_url: w.upi_qr_url,
+      address: w.address,
     });
   }
 
@@ -186,7 +196,12 @@ export function matchWorkers(
       avg_rating: w.avg_rating || 4.5,
       rating_count: w.rating_count || 10,
       experience_years: w.experience_years || 5.0,
-      reasons
+      reasons,
+      avatar_url: w.avatar_url,
+      bio: w.bio,
+      upi_id: w.upi_id,
+      upi_qr_url: w.upi_qr_url,
+      address: w.address,
     });
   }
 

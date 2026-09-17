@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { LocationItem, SERVICE_LOCATIONS, POPULAR_CITIES, searchLocations } from "../lib/locations";
+import { LocationItem, SERVICE_LOCATIONS, POPULAR_CITIES, searchLocations, reverseGeocodeGps, GpsExtractionResult } from "../lib/locations";
 
 interface LocationSearchSelectProps {
   selectedLocation: LocationItem;
   onSelectLocation: (loc: LocationItem) => void;
+  onGpsExtracted?: (result: GpsExtractionResult) => void;
   label?: string;
   helperText?: string;
   className?: string;
@@ -14,6 +15,7 @@ interface LocationSearchSelectProps {
 export default function LocationSearchSelect({
   selectedLocation,
   onSelectLocation,
+  onGpsExtracted,
   label = "Service Area",
   helperText = "Type area or city name to find verified cooperative coverage",
   className = "",
@@ -21,6 +23,7 @@ export default function LocationSearchSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("All");
+  const [isDetectingGps, setIsDetectingGps] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +70,34 @@ export default function LocationSearchSelect({
     onSelectLocation(customItem);
     setIsOpen(false);
     setSearchQuery("");
+  };
+
+  const handleGpsQuickDetect = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await reverseGeocodeGps(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          onSelectLocation(res.location);
+          if (onGpsExtracted) onGpsExtracted(res);
+          setIsOpen(false);
+        } catch (e) {
+          console.warn("GPS reverse geocode error:", e);
+        } finally {
+          setIsDetectingGps(false);
+        }
+      },
+      (err) => {
+        console.warn("GPS detect error:", err);
+        setIsDetectingGps(false);
+        alert("Location permission denied or unavailable. Please choose an area below.");
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   };
 
   return (
@@ -143,6 +174,33 @@ export default function LocationSearchSelect({
                   </svg>
                 </button>
               )}
+            </div>
+
+            {/* Quick GPS Location Detection Button */}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleGpsQuickDetect}
+                disabled={isDetectingGps}
+                className="w-full px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border border-emerald-300"
+              >
+                {isDetectingGps ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    Extracting GPS Location...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                    Use Current GPS Location
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Quick City Filter Pills */}

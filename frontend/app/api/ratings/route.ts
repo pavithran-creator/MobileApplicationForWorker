@@ -21,8 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ detail: "Only completed service bookings can be rated and reviewed" }, { status: 400 });
     }
 
-    // Check duplicate
-    const existing = dbStore.ratings.find(r => r.booking_id === booking.id);
+    // Check duplicate in Supabase
+    const { getSupabaseAdmin } = await import("@/lib/supabase/admin");
+    const supabase = getSupabaseAdmin();
+    const { data: existing } = await supabase.from("ratings").select("id").eq("booking_id", booking.id).maybeSingle();
     if (existing) {
       return NextResponse.json({ detail: "This booking has already been rated" }, { status: 400 });
     }
@@ -48,6 +50,13 @@ export async function POST(req: NextRequest) {
         created_at: new Date().toISOString()
       };
       dbStore.feedback.push(newFeedback);
+    }
+
+    try {
+      const { recordRatingInSupabase } = await import("@/lib/supabase/db");
+      await recordRatingInSupabase(booking.id, booking.worker_id, booking.customer_id, ratingVal, feedbackText);
+    } catch (dbErr) {
+      console.warn("Supabase rating persistence warning:", dbErr);
     }
 
     // Recalculate worker average rating accurately from database

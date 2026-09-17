@@ -10,7 +10,8 @@ import StatusBadge from "../../components/StatusBadge";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import EmptyState from "../../components/EmptyState";
 import LocationSearchSelect from "../../components/LocationSearchSelect";
-import { LocationItem, DEFAULT_LOCATION } from "../../lib/locations";
+import GpsLocationBar from "../../components/GpsLocationBar";
+import { LocationItem, DEFAULT_LOCATION, getStoredLocation } from "../../lib/locations";
 
 export default function EmergencyPage() {
   const router = useRouter();
@@ -18,9 +19,16 @@ export default function EmergencyPage() {
 
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<number | "">("");
-  const [selectedLocation, setSelectedLocation] = useState<LocationItem>(DEFAULT_LOCATION);
-  const [address, setAddress] = useState("142 Crosscut Road, Gandhipuram, Coimbatore");
+  const [selectedLocation, setSelectedLocation] = useState<LocationItem>(() => {
+    const cached = getStoredLocation();
+    return cached?.location || DEFAULT_LOCATION;
+  });
+  const [address, setAddress] = useState<string>(() => {
+    const cached = getStoredLocation();
+    return cached?.address || DEFAULT_LOCATION.name;
+  });
   const [description, setDescription] = useState("Urgent breakdown, immediate technician needed");
+  const [bookingForSelf, setBookingForSelf] = useState(true);
 
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [emergencyResult, setEmergencyResult] = useState<{
@@ -166,27 +174,66 @@ export default function EmergencyPage() {
           </div>
 
           <div>
-            <LocationSearchSelect
+            <GpsLocationBar
               selectedLocation={selectedLocation}
-              onSelectLocation={(newLoc) => {
-                setSelectedLocation(newLoc);
-                setAddress(newLoc.name);
+              currentAddress={address}
+              bookingForSelf={bookingForSelf}
+              onBookingForSelfChange={(isSelf) => setBookingForSelf(isSelf)}
+              onLocationExtracted={(res) => {
+                setSelectedLocation(res.location);
+                setAddress(res.address);
               }}
-              label={t("book.form_location", "Service Area")}
+              autoExtractOnMount={true}
+              themeColor="red"
             />
           </div>
+
+          {!bookingForSelf ? (
+            <div className="space-y-3 p-3.5 bg-blue-50/70 rounded-xl border border-blue-200">
+              <LocationSearchSelect
+                selectedLocation={selectedLocation}
+                onSelectLocation={(newLoc) => {
+                  setSelectedLocation(newLoc);
+                  setAddress(newLoc.name);
+                }}
+                onGpsExtracted={(res) => {
+                  setSelectedLocation(res.location);
+                  setAddress(res.address);
+                  setBookingForSelf(true);
+                }}
+                label="Emergency Site City & Area (For Other Person/Location)"
+                helperText="Emergency technicians nearest to this location will be summoned"
+              />
+            </div>
+          ) : null}
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-            {t("book.form_address", "Service Street Address")}
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              {bookingForSelf ? "Emergency Address (Auto-filled by GPS - No typing needed)" : "Site / Recipient Door & Street Address *"}
+            </label>
+            <span className="text-[11px] text-slate-500">
+              {bookingForSelf ? "⚡ Fast GPS Locked" : "Custom emergency destination"}
+            </span>
+          </div>
           <input
             type="text"
-            value={address}
+            value={
+              address &&
+              !address.toLowerCase().includes("detecting") &&
+              !address.toLowerCase().includes("extracting")
+                ? address
+                : selectedLocation.name
+            }
             onChange={(e) => setAddress(e.target.value)}
-            placeholder={t("book.form_address_placeholder", "Door No, Street Name, Landmark...")}
-            className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-600"
+            placeholder={selectedLocation.name}
+            className={`w-full px-3.5 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-red-600 ${
+              bookingForSelf ? "bg-red-50/30 border-red-200 font-medium text-slate-900" : "bg-white border-slate-300"
+            }`}
           />
         </div>
 

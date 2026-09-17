@@ -24,7 +24,7 @@
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                             BACKEND SERVICE LAYER                            │
 │                                                                              │
-│               FastAPI (Python 3.11)  •  Uvicorn  •  Pydantic v2              │
+│    Next.js 14 API Route Handlers  •  Supabase SSR & Admin SDK (@supabase)   │
 │                                                                              │
 │  ┌───────────────────────┬───────────────────────┬────────────────────────┐  │
 │  │  Matching & Geo Engine│  Scheduling & Concurr │   AI Forecasting Engine│  │
@@ -33,19 +33,19 @@
 │  │  • Score: 0 - 100     │  • Zero Double-Booking│  • Sparse Data Fallback│  │
 │  ├───────────────────────┼───────────────────────┼────────────────────────┤  │
 │  │  Security & Identity  │  Welfare & Governance │   Transparent Mocks    │  │
-│  │  • Bcrypt Hashing     │  • ESI / Accident Ins │  • Labeled Sandboxes   │  │
-│  │  • HS256 JWT Tokens   │  • Inter-Society Lend │  • Automated Invoices  │  │
+│  │  • Supabase Auth RLS  │  • ESI / Accident Ins │  • Labeled Sandboxes   │  │
+│  │  • Service Role Keys  │  • Inter-Society Lend │  • Automated Invoices  │  │
 │  │  • Role-Based Guards  │  • Tamper-Evident Logs│  • Zero False Claims   │  │
 │  └───────────────────────┴───────────────────────┴────────────────────────┘  │
 └──────────────────────────────────────┬───────────────────────────────────────┘
-                                       │ SQLAlchemy 2.0 ORM
+                                       │ Supabase Client & PostgREST
                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                               DATABASE LAYER                                 │
+│                       SUPABASE DATABASE & AUTH LAYER                         │
 │                                                                              │
-│             MySQL 8.0 Engine (Production)  /  SQLite 3 (Fallback)            │
-│             22 Normalized Relational Tables  •  Foreign Key Cascade          │
-│             Composite Slot Indexes  •  60-Day Seed Data (300+ Records)       │
+│        Supabase PostgreSQL 15 + PostGIS Spatial Engine                       │
+│        22+ Normalized Relational Tables  •  Foreign Key Cascade              │
+│        Row Level Security (RLS) Policies • Realtime Event Replication        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

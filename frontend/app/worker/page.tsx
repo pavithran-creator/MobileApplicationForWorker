@@ -11,6 +11,22 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 import EmptyState from "../../components/EmptyState";
 import AccessDenied from "../../components/AccessDenied";
 
+const AVATAR_PRESETS = [
+  { label: "Electrician", url: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=300&q=80" },
+  { label: "Plumber", url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80" },
+  { label: "Home Care", url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80" },
+  { label: "Carpenter", url: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80" },
+  { label: "Health Aide", url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80" },
+  { label: "Driver", url: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=300&q=80" },
+];
+
+const SUGGESTED_BIOS = [
+  "Senior certified electrician with 8+ years experience in domestic wiring and fault diagnosis.",
+  "Master plumber specializing in leak repairs, sanitary overhaul, and pump fixtures.",
+  "Experienced carpenter in modular woodwork, hinges, and furniture restoration.",
+  "Trained residential technician committed to transparent cooperative fair wages and clean finish.",
+];
+
 export default function WorkerPortalPage() {
   const router = useRouter();
   const { t } = useLang();
@@ -30,6 +46,96 @@ export default function WorkerPortalPage() {
   const [newSkillName, setNewSkillName] = useState("");
   const [newSkillExp, setNewSkillExp] = useState(2);
   const [addingSkill, setAddingSkill] = useState(false);
+
+  // Edit Profile Form State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
+
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
+  const [editUpiId, setEditUpiId] = useState("");
+  const [editUpiQrUrl, setEditUpiQrUrl] = useState("");
+  const [editExp, setEditExp] = useState(5);
+  const [editAddress, setEditAddress] = useState("");
+
+  const handleOpenEditModal = () => {
+    if (profile) {
+      setEditName(profile.name || "");
+      setEditPhone(profile.phone || "");
+      setEditBio(profile.bio || "");
+      setEditAvatarUrl(profile.avatar_url || "");
+      setEditUpiId(profile.upi_id || "");
+      setEditUpiQrUrl(profile.upi_qr_url || "");
+      setEditExp(profile.experience_years || 5);
+      setEditAddress(profile.address || "Coimbatore, Tamil Nadu");
+      setProfileSuccessMsg(null);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, targetField: "avatar" | "qr") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (loadEvt) => {
+      const dataUrl = loadEvt.target?.result as string;
+      if (targetField === "avatar") {
+        setEditAvatarUrl(dataUrl);
+      } else {
+        setEditUpiQrUrl(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileSuccessMsg(null);
+    try {
+      let finalQr = editUpiQrUrl;
+      if (!finalQr && editUpiId.trim()) {
+        const upiUri = `upi://pay?pa=${encodeURIComponent(editUpiId.trim())}&pn=${encodeURIComponent(editName.trim() || "Cooperative Worker")}&cu=INR`;
+        finalQr = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiUri)}`;
+      }
+
+      await request<any>("/workers/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editName,
+          phone: editPhone,
+          bio: editBio,
+          avatar_url: editAvatarUrl,
+          upi_id: editUpiId,
+          upi_qr_url: finalQr,
+          experience_years: Number(editExp),
+          address: editAddress,
+        }),
+      });
+
+      const u = getCurrentUser();
+      if (u) {
+        u.name = editName;
+        localStorage.setItem("ondemand_user", JSON.stringify(u));
+        setCurrentUser(u);
+      }
+
+      setProfileSuccessMsg("Profile and transaction QR code saved successfully!");
+      fetchWorkerData();
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setProfileSuccessMsg(null);
+      }, 1200);
+    } catch (err: any) {
+      alert("Failed to save profile: " + err.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const fetchWorkerData = async () => {
     try {
@@ -136,11 +242,31 @@ export default function WorkerPortalPage() {
       {/* Header Profile Bar */}
       {profile && (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-800 text-white flex items-center justify-center text-2xl font-bold shadow-md">
-              ⚙
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1">
+            {/* Avatar with Quick Edit Overlay */}
+            <div className="relative group shrink-0">
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.name}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-600 shadow-md bg-slate-100"
+                />
+              ) : (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-800 text-white flex items-center justify-center text-2xl font-bold shadow-md">
+                  {profile.name ? profile.name.charAt(0) : "⚙"}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenEditModal}
+                title="Edit profile photo & details"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-800 hover:bg-emerald-900 text-white flex items-center justify-center text-xs shadow-md border-2 border-white transition-transform group-hover:scale-110"
+              >
+                ✎
+              </button>
             </div>
-            <div>
+
+            <div className="space-y-1.5 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-extrabold text-slate-900 font-heading">
                   {profile.name}
@@ -151,17 +277,52 @@ export default function WorkerPortalPage() {
                     status={profile.verification_status}
                   />
                 )}
+                <button
+                  type="button"
+                  onClick={handleOpenEditModal}
+                  className="ml-auto sm:ml-2 px-3 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs"
+                >
+                  <span>✎</span>
+                  <span>Edit Profile</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsQrModalOpen(true)}
+                  className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-semibold text-xs transition-colors flex items-center gap-1"
+                >
+                  <span>📲</span>
+                  <span>My QR Code</span>
+                </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+
+              <p className="text-xs text-slate-500">
                 {profile.cooperative || "Coimbatore Central Labour Cooperative"} &bull; {profile.phone}
+                {profile.upi_id && (
+                  <span className="ml-2 font-mono text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                    UPI: {profile.upi_id}
+                  </span>
+                )}
               </p>
-              <div className="flex items-center gap-2 mt-2">
+
+              {/* Bio Snippet */}
+              {profile.bio && (
+                <p className="text-xs text-slate-600 italic bg-slate-50 border border-slate-200/60 p-2 rounded-xl max-w-xl">
+                  &ldquo;{profile.bio}&rdquo;
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 pt-0.5">
                 <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
                   ★ {profile.avg_rating?.toFixed(1) || "5.0"} ({profile.rating_count || 0})
                 </span>
                 <span className="text-xs text-slate-500">
                   {t("book.experience", "{years} yrs exp", { years: profile.experience_years || 2 })}
                 </span>
+                {profile.address && (
+                  <span className="text-xs text-slate-400">
+                    &bull; 📍 {profile.address}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -379,6 +540,66 @@ export default function WorkerPortalPage() {
             </form>
           </div>
 
+          {/* Dedicated Transaction QR Code & Digital Settlement Card */}
+          <div className="bg-gradient-to-br from-emerald-900 to-slate-900 text-white border border-emerald-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-emerald-800/60 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <h3 className="text-base font-bold text-emerald-100 font-heading">
+                  Transaction &amp; Payout QR
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-800 text-emerald-200 border border-emerald-700">
+                Direct UPI
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4 bg-emerald-950/60 p-3 rounded-xl border border-emerald-700/50">
+              <div 
+                onClick={() => setIsQrModalOpen(true)}
+                className="w-24 h-24 bg-white p-1.5 rounded-xl shrink-0 cursor-pointer shadow hover:ring-2 hover:ring-amber-400 transition-all flex items-center justify-center overflow-hidden"
+                title="Click to enlarge scannable QR"
+              >
+                {profile?.upi_qr_url ? (
+                  <img src={profile.upi_qr_url} alt="Transaction QR" className="w-full h-full object-contain" />
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent('upi://pay?pa=' + (profile?.upi_id || 'suresh.electrician@oksbi') + '&pn=' + (profile?.name || 'Worker') + '&cu=INR')}`}
+                    alt="Transaction QR"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <div className="font-bold text-amber-300">Doorstep QR Scanner</div>
+                <div className="text-[11px] text-emerald-200 font-mono break-all">
+                  {profile?.upi_id || "suresh.electrician@oksbi"}
+                </div>
+                <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+                  Customers scan this QR code directly when booking or settling services on-site.
+                </p>
+                <div className="pt-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsQrModalOpen(true)}
+                    className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline"
+                  >
+                    Enlarge QR
+                  </button>
+                  <span className="text-emerald-700">&bull;</span>
+                  <button
+                    type="button"
+                    onClick={handleOpenEditModal}
+                    className="text-[10px] font-bold text-emerald-300 hover:text-white underline"
+                  >
+                    Update QR / UPI
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Social Security & Welfare Schemes */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -447,6 +668,330 @@ export default function WorkerPortalPage() {
           </div>
         </div>
       </div>
+
+      {/* EDIT PROFILE MODAL */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-6 my-auto animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-800 text-white flex items-center justify-center font-bold text-lg">
+                  ✎
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 font-heading">
+                    Edit Worker Profile &amp; Payout QR
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Update your public trade profile, avatar, bio, and transaction QR code.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-2xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            {profileSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-800 flex items-center gap-2">
+                <span>✓</span>
+                <span>{profileSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-5">
+              {/* 1. Profile Picture Section */}
+              <div className="space-y-2.5 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  1. Profile Photo
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-emerald-600 bg-white shadow shrink-0 flex items-center justify-center">
+                    {editAvatarUrl ? (
+                      <img src={editAvatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl text-slate-300">👤</span>
+                    )}
+                  </div>
+                  <div className="space-y-2 flex-1 w-full">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs cursor-pointer transition-colors shadow-sm">
+                        <span>Upload Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, "avatar")}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatarUrl("")}
+                        className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Or pick a trade avatar preset:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {AVATAR_PRESETS.map((preset, idx) => (
+                        <button
+                          type="button"
+                          key={idx}
+                          onClick={() => setEditAvatarUrl(preset.url)}
+                          className={`text-[11px] px-2 py-0.5 rounded-lg border transition-all ${
+                            editAvatarUrl === preset.url
+                              ? "bg-emerald-100 border-emerald-600 text-emerald-900 font-bold"
+                              : "bg-white border-slate-300 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Professional Bio Section */}
+              <div className="space-y-2 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    2. Trade Biography &amp; Experience
+                  </label>
+                  <span className="text-[11px] text-slate-400">Max 250 characters</span>
+                </div>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  maxLength={250}
+                  rows={3}
+                  placeholder="Describe your trade specializations, certifications, and service values..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+                <div className="text-[11px] text-slate-500">Quick suggestions:</div>
+                <div className="flex flex-wrap gap-1">
+                  {SUGGESTED_BIOS.map((sug, idx) => (
+                    <button
+                      type="button"
+                      key={idx}
+                      onClick={() => setEditBio(sug)}
+                      className="text-[10px] text-left px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700"
+                    >
+                      + {sug.slice(0, 45)}...
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Transaction QR Code & UPI Section */}
+              <div className="space-y-3 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📲</span>
+                    <span>3. Direct Transaction QR Code &amp; UPI ID</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                    Shown to Customer at Booking
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Customers scan this QR code directly when booking or paying for this service.
+                </p>
+
+                <div className="grid sm:grid-cols-12 gap-4 items-center">
+                  <div className="sm:col-span-4 flex flex-col items-center">
+                    <div className="w-28 h-28 bg-white p-2 rounded-xl border border-emerald-300 shadow-sm flex items-center justify-center overflow-hidden">
+                      {editUpiQrUrl ? (
+                        <img src={editUpiQrUrl} alt="Transaction QR Preview" className="w-full h-full object-contain" />
+                      ) : editUpiId ? (
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent('upi://pay?pa=' + editUpiId.trim() + '&pn=' + (editName || 'Worker') + '&cu=INR')}`}
+                          alt="Generated QR"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-400 text-center font-mono">No QR</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-emerald-800 font-semibold mt-1">Live Scanner Preview</span>
+                  </div>
+
+                  <div className="sm:col-span-8 space-y-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        UPI ID / Virtual Payment Address (VPA)
+                      </label>
+                      <input
+                        type="text"
+                        value={editUpiId}
+                        onChange={(e) => setEditUpiId(e.target.value)}
+                        placeholder="e.g. suresh.electrician@oksbi"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Upload Custom QR Image (Google Pay / PhonePe / Paytm / Apex Bank)
+                      </label>
+                      <div className="flex gap-2">
+                        <label className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs cursor-pointer transition-colors shadow-2xs">
+                          <span>Choose QR Image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(e, "qr")}
+                            className="hidden"
+                          />
+                        </label>
+                        {editUpiQrUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditUpiQrUrl("")}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold"
+                          >
+                            Reset to Auto
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Operating Details (Name, Phone, Address, Exp) */}
+              <div className="grid sm:grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Operating Address / Hub Area</label>
+                  <input
+                    type="text"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Years of Experience</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    step={0.5}
+                    value={editExp}
+                    onChange={(e) => setEditExp(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {savingProfile ? "Saving Profile..." : "Save Profile &amp; QR Code"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ENLARGED TRANSACTION QR MODAL */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="text-left">
+                <h3 className="font-extrabold text-slate-900 font-heading text-base">
+                  Doorstep Transaction QR
+                </h3>
+                <p className="text-[11px] text-emerald-800 font-semibold">
+                  {profile?.name} &bull; {profile?.cooperative}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 inline-block">
+              <div className="w-56 h-56 bg-white p-2.5 rounded-xl shadow-md mx-auto flex items-center justify-center overflow-hidden">
+                {profile?.upi_qr_url ? (
+                  <img src={profile.upi_qr_url} alt="Transaction QR" className="w-full h-full object-contain" />
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent('upi://pay?pa=' + (profile?.upi_id || 'suresh.electrician@oksbi') + '&pn=' + (profile?.name || 'Worker') + '&cu=INR')}`}
+                    alt="Transaction QR"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs font-bold text-slate-800">Scan to Pay via Any UPI App</div>
+              <div className="font-mono text-xs text-emerald-800 font-bold bg-emerald-50 py-1 px-2.5 rounded-lg border border-emerald-200 inline-block">
+                {profile?.upi_id || "suresh.electrician@oksbi"}
+              </div>
+              <p className="text-[11px] text-slate-500 pt-1">
+                GPay, PhonePe, Paytm, BHIM &amp; Apex Cooperative Bank supported.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
