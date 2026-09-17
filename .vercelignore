@@ -1,5 +1,6 @@
 # Exclude only root documentation, database migrations, and batch scripts
 /supabase/
 /docs/
+/mobile/
 *.bat
 README.md

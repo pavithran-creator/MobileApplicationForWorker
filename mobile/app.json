@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "ON-DEMAND Labour Cooperative",
+    "slug": "ondemand-cooperative",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "ondemand",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.tncoop.ondemand",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ON-DEMAND requires camera access to take live photos of repair issues for verified worker assessment.",
+        "NSLocationWhenInUseUsageDescription": "ON-DEMAND uses your location to geo-match nearby cooperative tradespersons.",
+        "NSMicrophoneUsageDescription": "ON-DEMAND uses your microphone for hands-free voice problem descriptions."
+      }
+    },
+    "android": {
+      "package": "org.tncoop.ondemand",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c9cff62e-3af3-4b5f-abb7-78a31ce5dabd"
+      }
+    }
+  }
+}
