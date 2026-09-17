@@ -1,5 +1,4 @@
 # Exclude documentation and database scripts from Vercel deployment
-docs/
 supabase/
 *.bat
 README.md
