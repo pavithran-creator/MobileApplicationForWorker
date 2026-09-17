@@ -88,6 +88,8 @@ export interface BookingRecord {
   coop_charge: number;
   address: string;
   description?: string;
+  worker_upi_id?: string;
+  worker_upi_qr_url?: string;
 }
 
 export interface InvoiceItem {
@@ -96,9 +98,11 @@ export interface InvoiceItem {
 }
 
 export interface InvoiceRecord {
+  id?: number;
   invoice_no: string;
   booking_id: number;
   date: string;
+  created_at?: string;
   total: number;
   worker_wage?: number;
   coop_charge?: number;

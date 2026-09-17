@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
     if (token.startsWith("sb-token-")) {
       const parts = token.split("-");
       const uid = parseInt(parts[2], 10);
-      user = dbStore.users.find(u => u.id === uid);
+      user = dbStore.users.find(u => u.role === "WORKER" && (u.id === uid || u.worker_id === uid));
     }
 
     if (!user || user.role !== "WORKER") {
@@ -88,7 +88,7 @@ export async function PATCH(req: NextRequest) {
       const wid = user.worker_id || user.id;
 
       // Update worker record
-      await supabase
+      const { error: wErr } = await supabase
         .from("workers")
         .update({
           avatar_url: user.avatar_url,
@@ -99,6 +99,20 @@ export async function PATCH(req: NextRequest) {
           experience_years: user.experience_years,
         })
         .eq("id", wid);
+
+      if (wErr) {
+        await supabase
+          .from("workers")
+          .update({
+            avatar_url: user.avatar_url,
+            bio: user.bio,
+            upi_id: user.upi_id,
+            upi_qr_url: user.upi_qr_url,
+            address: user.address,
+            experience_years: user.experience_years,
+          })
+          .eq("user_id_num", user.id);
+      }
 
       // Update profile record if user_id_num or phone matches
       await supabase

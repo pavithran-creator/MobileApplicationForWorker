@@ -15,8 +15,13 @@ export default function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
     }
   };
 
-  const workerWage = invoice.worker_wage ?? (invoice.total * 0.9);
-  const coopFee = invoice.coop_charge ?? (invoice.total * 0.1);
+  const totalAmount = parseFloat(String(invoice.total || 0)) || 0;
+  const workerWage = invoice.worker_wage !== undefined && invoice.worker_wage !== null
+    ? (parseFloat(String(invoice.worker_wage)) || 0)
+    : Math.round(totalAmount * 0.9 * 100) / 100;
+  const coopFee = invoice.coop_charge !== undefined && invoice.coop_charge !== null
+    ? (parseFloat(String(invoice.coop_charge)) || 0)
+    : Math.round((totalAmount - workerWage) * 100) / 100;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -52,7 +57,7 @@ export default function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
                   {invoice.invoice_no}
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Issued: {invoice.date}
+                  Issued: {invoice.date || new Date().toISOString().split("T")[0]}
                 </div>
               </div>
             </div>
@@ -117,7 +122,7 @@ export default function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
                     Total Settled Amount (INR)
                   </td>
                   <td className="py-3 px-4 text-right text-base text-emerald-900 font-black">
-                    ₹{invoice.total.toFixed(2)}
+                    ₹{totalAmount.toFixed(2)}
                   </td>
                 </tr>
               </tfoot>

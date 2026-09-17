@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
           service_id,
           services ( name ),
           customers ( user_id_num, profiles ( name, phone ) ),
-          workers ( user_id_num, profiles ( name, phone ) )
+          workers ( id, user_id_num, upi_id, upi_qr_url, profiles ( name, phone ) )
         `)
         .order("id", { ascending: false });
 
@@ -64,6 +64,8 @@ export async function GET(req: NextRequest) {
           worker_id: b.worker_id,
           worker_name: b.workers?.profiles?.name || "Verified Worker",
           worker_phone: b.workers?.profiles?.phone || "",
+          worker_upi_id: b.workers?.upi_id || "",
+          worker_upi_qr_url: b.workers?.upi_qr_url || "",
           customer_id: b.customer_id,
           customer_name: b.customers?.profiles?.name || "Customer",
           date: b.scheduled_date,
@@ -105,6 +107,8 @@ export async function GET(req: NextRequest) {
         worker_id: b.worker_id,
         worker_name: worker ? worker.name : "Verified Worker",
         worker_phone: worker ? worker.phone : "",
+        worker_upi_id: worker?.upi_id || "",
+        worker_upi_qr_url: worker?.upi_qr_url || "",
         customer_id: b.customer_id,
         customer_name: customer ? customer.name : "Customer",
         date: b.scheduled_date,
@@ -220,7 +224,13 @@ export async function POST(req: NextRequest) {
       start_time: createdBooking.start_time,
       duration_min: createdBooking.duration_min,
       total_amount: createdBooking.total_amount,
+      service_amount: createdBooking.service_amount,
+      coop_charge: createdBooking.coop_charge,
+      worker_id: targetWorkerId,
       worker_name: worker.name,
+      worker_phone: worker.phone,
+      worker_upi_id: worker.upi_id,
+      worker_upi_qr_url: worker.upi_qr_url,
       service_name: svc ? svc.name : "Cooperative Trade Service"
     });
   } catch (err: any) {
