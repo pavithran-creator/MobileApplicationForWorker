@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const geminiKey = process.env.GEMINI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.AI_API_KEY;
 
     // 1. Try Google Gemini Vision if API key is configured
     if (geminiKey) {
