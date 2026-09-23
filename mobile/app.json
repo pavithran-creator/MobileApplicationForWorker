@@ -18,6 +18,7 @@
     "android": {
       "package": "org.tncoop.ondemand",
       "versionCode": 1,
+      "newArchEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -25,8 +26,20 @@
         "android.permission.RECORD_AUDIO"
       ]
     },
+    "newArchEnabled": false,
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-camera",
+      "expo-location",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25",
+            "enableProguardInReleaseBuilds": false
+          }
+        }
+      ]
     ],
     "web": {
       "bundler": "metro"

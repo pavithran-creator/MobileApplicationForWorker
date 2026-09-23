@@ -1,375 +1,427 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../lib/auth';
-import { useI18n } from '../../lib/i18n';
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image } from "react-native";
+import { useRouter } from "expo-router";
+import MobileHeader from "../../components/Header";
+import { useAuth } from "../../lib/auth";
+import { useLang } from "../../lib/i18n";
+import { colors, radii, shadows } from "../../lib/theme";
+import {
+  ShieldCheck,
+  Star,
+  Award,
+  CreditCard,
+  Building2,
+  LogOut,
+  UserCheck,
+  Check,
+} from "lucide-react-native";
 
 export default function WorkerProfileScreen() {
   const router = useRouter();
-  const { user, profile, workerProfile, signOut, switchPersona } = useAuth();
-  const { language, setLanguage, t } = useI18n();
+  const { user, signOut, switchPersona } = useAuth();
+  const { lang, setLang, t } = useLang();
 
-  const [upiId, setUpiId] = useState(
-    profile?.phone ? `coop.${profile.phone}@okhdfcbank` : 'suresh.kumar@okhdfcbank'
-  );
+  const [upiId, setUpiId] = useState("suresh.coop@oksbi");
   const [editingUpi, setEditingUpi] = useState(false);
 
   const handleSaveUpi = () => {
     setEditingUpi(false);
-    Alert.alert('UPI Updated', 'Your direct settlement UPI ID has been updated in the cooperative ledger.');
+    Alert.alert("UPI Updated", "Your direct settlement UPI ID has been recorded for instant dispatches.");
   };
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/(auth)/login');
+    router.replace("/(auth)/login");
   };
 
   const handleSwitchToCustomer = async () => {
-    await switchPersona('customer');
-    router.replace('/(customer)');
+    await switchPersona("customer");
+    router.replace("/(customer)");
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Profile Header Card */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#16A34A" />
-        </View>
+    <View style={styles.screen}>
+      <MobileHeader title="Cooperative Worker Profile" showEmergency={false} />
 
-        <Text style={styles.nameText}>{profile?.full_name || 'Suresh Kumar'}</Text>
-        <Text style={styles.tradeText}>
-          {workerProfile?.primary_skill || 'Certified Electrician'} • {workerProfile?.experience_years || 7} Years Exp.
-        </Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarBox}>
+            <Image
+              source={{ uri: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?auto=format&fit=crop&w=300&q=80" }}
+              style={styles.avatarImg}
+            />
+          </View>
 
-        <View style={styles.badgeRow}>
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="shield-checkmark" size={14} color="#16A34A" />
-            <Text style={styles.verifiedBadgeText}>VERIFIED COOPERATIVE MEMBER</Text>
+          <Text style={styles.nameText}>{user?.name || "Suresh Kumar"}</Text>
+          <Text style={styles.tradeText}>Certified Electrician &bull; 8 Years Experience</Text>
+
+          <View style={styles.verifiedPill}>
+            <ShieldCheck size={12} color="#047857" />
+            <Text style={styles.verifiedPillText}>VERIFIED COOPERATIVE MEMBER</Text>
+          </View>
+
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>98%</Text>
+              <Text style={styles.statLbl}>Coop Score</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>4.9 ★</Text>
+              <Text style={styles.statLbl}>Rating (142)</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statVal}>210</Text>
+              <Text style={styles.statLbl}>Jobs Done</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>98%</Text>
-            <Text style={styles.statLbl}>Coop Score</Text>
+        {/* Language Selection Card */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>{t("profile.select_language", "Choose Interface Language")}</Text>
+          <Text style={styles.langHelpText}>{t("profile.lang_desc", "Switch app display between English, தமிழ், and हिन्दी.")}</Text>
+          <View style={styles.langSelectionGrid}>
+            {[
+              { code: "en", label: "English", native: "English" },
+              { code: "ta", label: "தமிழ்", native: "Tamil" },
+              { code: "hi", label: "हिन्दी", native: "Hindi" },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.code}
+                style={[styles.langChoiceBtn, lang === item.code && styles.langChoiceBtnActive]}
+                onPress={() => setLang(item.code)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.langChoiceText, lang === item.code && styles.langChoiceTextActive]}>
+                  {item.label}
+                </Text>
+                <Text style={[styles.langChoiceSub, lang === item.code && styles.langChoiceSubActive]}>
+                  {item.native}
+                </Text>
+                {lang === item.code && <Check size={14} color="#059669" style={{ marginTop: 4 }} />}
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>4.9 ★</Text>
-            <Text style={styles.statLbl}>Rating (142)</Text>
+        </View>
+
+        {/* Cooperative Credentials */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>{t("worker.skills_title", "Cooperative Credentials")}</Text>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoKey}>{t("worker.scheme_id", "Member Registration")}</Text>
+            <Text style={styles.infoVal}>TNCF/CBE/1983/9412</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>210</Text>
-            <Text style={styles.statLbl}>Jobs Done</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoKey}>{t("admin.col_coop", "Affiliated Society")}</Text>
+            <Text style={styles.infoVal}>Gandhipuram Labour Cooperative</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoKey}>{t("status.certified", "Govt Trade License")}</Text>
+            <Text style={styles.infoVal}>TN-ELE-LIC-94129 ({t("welfare.status_active", "Valid")})</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoKey}>{t("footer.fair_wages", "Statutory Wage Share")}</Text>
+            <Text style={[styles.infoVal, { color: colors.brand.primary, fontWeight: "800" }]}>
+              90% Direct Take-Home
+            </Text>
           </View>
         </View>
-      </View>
 
-      {/* Cooperative Membership Credentials */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Cooperative Credentials</Text>
+        {/* Direct UPI Settlement */}
+        <View style={styles.sectionCard}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.sectionTitle}>Direct UPI Settlement</Text>
+            <TouchableOpacity onPress={() => (editingUpi ? handleSaveUpi() : setEditingUpi(true))}>
+              <Text style={styles.editLink}>{editingUpi ? t("common.success", "Save") : "Edit"}</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoKey}>Member ID</Text>
-          <Text style={styles.infoVal}>TN-COOP-MBR-2024-8841</Text>
+          {editingUpi ? (
+            <TextInput
+              value={upiId}
+              onChangeText={setUpiId}
+              style={styles.upiInput}
+              autoCapitalize="none"
+              placeholder="worker@okhdfcbank"
+            />
+          ) : (
+            <View style={styles.upiDisplay}>
+              <CreditCard size={15} color={colors.brand.primary} />
+              <Text style={styles.upiText}>{upiId}</Text>
+            </View>
+          )}
+          <Text style={styles.upiHint}>
+            Customer payments are disbursed directly to this UPI address after completion.
+          </Text>
         </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoKey}>Affiliated Society</Text>
-          <Text style={styles.infoVal}>Chennai Central Electrical Coop</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoKey}>Govt Trade License</Text>
-          <Text style={styles.infoVal}>TN-ELE-LIC-94129 (Valid till 2028)</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoKey}>Fair Wage Share</Text>
-          <Text style={[styles.infoVal, { color: '#16A34A', fontWeight: '800' }]}>90% Direct Pay</Text>
-        </View>
-      </View>
 
-      {/* Direct UPI Settlement Handle */}
-      <View style={styles.sectionCard}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Direct UPI Settlement</Text>
-          <TouchableOpacity onPress={() => (editingUpi ? handleSaveUpi() : setEditingUpi(true))}>
-            <Text style={styles.editLink}>{editingUpi ? 'Save' : 'Edit'}</Text>
+        {/* Switch Persona & Sign Out */}
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={handleSwitchToCustomer}
+            activeOpacity={0.8}
+          >
+            <UserCheck size={16} color={colors.brand.primary} />
+            <Text style={styles.switchBtnText}>Switch to Customer Mode</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={handleSignOut}
+            activeOpacity={0.8}
+          >
+            <LogOut size={16} color="#DC2626" />
+            <Text style={styles.signOutText}>{t("nav.logout", "Sign Out of Registry")}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.upiDesc}>
-          Customers transfer payments directly to this UPI handle during service completion. Zero platform commission.
-        </Text>
-
-        {editingUpi ? (
-          <TextInput
-            style={styles.upiInput}
-            value={upiId}
-            onChangeText={setUpiId}
-            placeholder="yourname@bank"
-          />
-        ) : (
-          <View style={styles.upiDisplayBox}>
-            <Ionicons name="qr-code-outline" size={20} color="#16A34A" />
-            <Text style={styles.upiDisplayText}>{upiId}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Language Switcher */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>App Language / மொழி / भाषा</Text>
-        <View style={styles.langRow}>
-          {[
-            { code: 'en', label: 'English' },
-            { code: 'ta', label: 'தமிழ்' },
-            { code: 'hi', label: 'हिन्दी' },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.code}
-              style={[styles.langPill, language === item.code && styles.langPillActive]}
-              onPress={() => setLanguage(item.code as any)}
-            >
-              <Text style={[styles.langPillText, language === item.code && styles.langPillTextActive]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Switch to Customer Persona & Sign Out */}
-      <View style={styles.actionsBox}>
-        <TouchableOpacity style={styles.switchPersonaBtn} onPress={handleSwitchToCustomer}>
-          <Ionicons name="swap-horizontal" size={18} color="#1E3A8A" />
-          <Text style={styles.switchPersonaText}>Switch to Customer Portal</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-          <Text style={styles.signOutText}>Log Out</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface.pageBg,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 40,
-    gap: 14,
   },
   profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 18,
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
+    borderColor: colors.surface.border,
+    ...shadows.card,
+    marginBottom: 14,
   },
-  avatar: {
+  avatarBox: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: radii.full,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: colors.brand.primary,
     marginBottom: 10,
+  },
+  avatarImg: {
+    width: "100%",
+    height: "100%",
   },
   nameText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.text.primary,
   },
   tradeText: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: 12,
+    color: colors.text.secondary,
     marginTop: 2,
-    marginBottom: 10,
   },
-  badgeRow: {
-    marginBottom: 16,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+  verifiedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ECFDF5",
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    gap: 6,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+    marginTop: 8,
   },
-  verifiedBadgeText: {
-    color: '#16A34A',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  verifiedPillText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "#047857",
   },
   statsRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    width: "100%",
+    marginTop: 16,
     paddingTop: 14,
-    width: '100%',
-    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: colors.surface.border,
   },
   statBox: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   statVal: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.brand.primary,
   },
   statLbl: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 10,
+    color: colors.text.muted,
+    marginTop: 1,
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#E2E8F0',
     height: 24,
-    alignSelf: 'center',
+    backgroundColor: colors.surface.border,
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.surface.border,
+    ...shadows.card,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 13.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
     marginBottom: 8,
   },
   rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  editLink: {
-    fontSize: 13,
-    color: '#16A34A',
-    fontWeight: '700',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: "#F1F5F9",
   },
   infoKey: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: 11.5,
+    color: colors.text.secondary,
   },
   infoVal: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.text.primary,
   },
-  upiDesc: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 10,
-    lineHeight: 16,
-  },
-  upiDisplayBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  upiDisplayText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#166534',
+  editLink: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: colors.brand.primary,
   },
   upiInput: {
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+    borderColor: colors.brand.primary,
+    borderRadius: radii.md,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    color: colors.text.primary,
+    marginTop: 6,
+  },
+  upiDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F8FAFC",
     padding: 10,
-    fontSize: 14,
-    color: '#0F172A',
-  },
-  langRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  langPill: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-  },
-  langPillActive: {
-    backgroundColor: '#16A34A',
-  },
-  langPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  langPillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  actionsBox: {
-    gap: 10,
-    marginTop: 4,
-  },
-  switchPersonaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 8,
+    borderColor: colors.surface.border,
+    marginTop: 4,
   },
-  switchPersonaText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E3A8A',
+  upiText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  upiHint: {
+    fontSize: 10,
+    color: colors.text.muted,
+    marginTop: 6,
+  },
+  actionsContainer: {
+    gap: 10,
+    marginTop: 8,
+  },
+  switchBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+  },
+  switchBtnText: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: colors.brand.primary,
   },
   signOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#FEF2F2",
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: "#FECACA",
     paddingVertical: 12,
-    borderRadius: 10,
-    gap: 8,
+    borderRadius: radii.lg,
   },
   signOutText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#DC2626',
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: "#DC2626",
+  },
+  langHelpText: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginBottom: 10,
+  },
+  langSelectionGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  langChoiceBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: radii.md,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+  },
+  langChoiceBtnActive: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+  langChoiceText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.text.primary,
+  },
+  langChoiceTextActive: {
+    color: colors.brand.primary,
+  },
+  langChoiceSub: {
+    fontSize: 9.5,
+    color: colors.text.muted,
+    marginTop: 2,
+  },
+  langChoiceSubActive: {
+    color: "#047857",
   },
 });

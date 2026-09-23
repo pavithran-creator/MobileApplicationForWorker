@@ -1,19 +1,36 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Modal,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../lib/auth";
-import { Shield, ArrowLeft, Phone, Lock, Check } from "lucide-react-native";
+import { useLang, SUPPORTED_LANGUAGES } from "../../lib/i18n";
+import { colors, radii, shadows } from "../../lib/theme";
+import { ArrowLeft, Globe, Check } from "lucide-react-native";
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(false);
   const { login, quickLogin } = useAuth();
+  const { lang, setLang, t } = useLang();
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!phone.trim()) {
-      Alert.alert("Required", "Please enter your mobile phone number.");
+      Alert.alert(
+        t("common.error", "Required"),
+        t("auth.enter_phone", "Please enter your mobile phone number.")
+      );
       return;
     }
     setLoading(true);
@@ -25,7 +42,10 @@ export default function LoginScreen() {
         router.replace("/(customer)");
       }
     } catch (err: any) {
-      Alert.alert("Sign In Failed", err.message || "Invalid credentials. Please verify your phone number.");
+      Alert.alert(
+        t("common.error", "Sign In Failed"),
+        err.message || t("common.error", "Invalid credentials.")
+      );
     } finally {
       setLoading(false);
     }
@@ -41,7 +61,7 @@ export default function LoginScreen() {
         router.replace("/(customer)");
       }
     } catch (err: any) {
-      Alert.alert("Demo Login Error", err.message);
+      Alert.alert(t("common.error", "Demo Login Error"), err.message);
     } finally {
       setLoading(false);
     }
@@ -49,76 +69,146 @@ export default function LoginScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <ArrowLeft size={20} color="#065f46" />
-        <Text style={styles.backText}>Back</Text>
-      </TouchableOpacity>
+      <View style={styles.topNavRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ArrowLeft size={16} color={colors.brand.primary} />
+          <Text style={styles.backText}>{t("nav.home", "Back to Home")}</Text>
+        </TouchableOpacity>
 
+        {/* Language Switcher Button */}
+        <TouchableOpacity
+          style={styles.langBtn}
+          onPress={() => setShowLangModal(true)}
+          activeOpacity={0.7}
+        >
+          <Globe size={13} color="#065F46" />
+          <Text style={styles.langBtnText}>{lang.toUpperCase()}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Header crest matching web */}
       <View style={styles.header}>
         <View style={styles.logoBadge}>
-          <Shield size={28} color="#065f46" />
+          <Text style={styles.logoIcon}>⚙</Text>
         </View>
-        <Text style={styles.title}>Sign in to ON-DEMAND</Text>
-        <Text style={styles.subtitle}>Access bookings, cooperative job orders, or statutory welfare records.</Text>
+        <Text style={styles.title}>{t("auth.welcome_back", "Sign in to your account")}</Text>
+        <Text style={styles.subtitle}>
+          {t("auth.sign_in_sub", "Access your bookings, assignments, or administrative controls.")}
+        </Text>
       </View>
 
+      {/* Form Card */}
       <View style={styles.formCard}>
-        <Text style={styles.inputLabel}>Mobile Phone Number</Text>
-        <View style={styles.inputWrapper}>
-          <Phone size={18} color="#64748b" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. 9000000011"
-            placeholderTextColor="#94a3b8"
-            keyboardType="phone-pad"
-            value={phone}
-            onChangeText={setPhone}
-          />
-        </View>
+        <Text style={styles.inputLabel}>{t("auth.phone_label", "REGISTERED PHONE NUMBER")}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t("auth.phone_placeholder", "10-digit mobile number")}
+          placeholderTextColor={colors.text.subtle}
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
+        />
 
-        <Text style={styles.inputLabel}>Password</Text>
-        <View style={styles.inputWrapper}>
-          <Lock size={18} color="#64748b" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter password"
-            placeholderTextColor="#94a3b8"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-        </View>
+        <Text style={styles.inputLabel}>{t("auth.password_label", "PASSWORD")}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t("auth.password_placeholder", "Enter password")}
+          placeholderTextColor={colors.text.subtle}
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleLogin} disabled={loading} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.submitBtnText}>Sign In</Text>
+            <Text style={styles.submitBtnText}>{t("auth.sign_in_btn", "Sign In")}</Text>
           )}
         </TouchableOpacity>
-      </View>
 
-      {/* 1-Click Fast Fill Personas */}
-      <View style={styles.quickCard}>
-        <Text style={styles.quickTitle}>Or 1-Click Demo Login</Text>
-        <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => handleQuick("CUSTOMER")}>
-            <Check size={14} color="#065f46" />
-            <Text style={styles.quickBtnText}>Customer (Meena)</Text>
+        {/* 1-Click Demo Personas Grid matching web */}
+        <View style={styles.demoDivider} />
+        <View style={styles.demoHeaderRow}>
+          <Text style={styles.demoHeader}>{t("auth.demoTitle", "1-CLICK DEMO PERSONAS")}</Text>
+          <View style={styles.instantPill}>
+            <Text style={styles.instantPillText}>{t("auth.instantAccess", "Instant Access")}</Text>
+          </View>
+        </View>
+
+        <View style={styles.demoGrid}>
+          <TouchableOpacity
+            style={styles.demoCard}
+            onPress={() => handleQuick("CUSTOMER")}
+          >
+            <Text style={styles.demoCardRole}>{t("auth.role_customer_title", "Customer")}</Text>
+            <Text style={styles.demoCardName}>Meena Sundaram</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickBtn, styles.quickWorkerBtn]} onPress={() => handleQuick("WORKER")}>
-            <Check size={14} color="#0284c7" />
-            <Text style={[styles.quickBtnText, styles.quickWorkerText]}>Worker (Suresh)</Text>
+
+          <TouchableOpacity
+            style={styles.demoCard}
+            onPress={() => handleQuick("WORKER")}
+          >
+            <Text style={styles.demoCardRole}>{t("auth.role_worker_title", "Skilled Worker")}</Text>
+            <Text style={styles.demoCardName}>Suresh (Electrician)</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      <View style={styles.registerLinkRow}>
-        <Text style={styles.regText}>Don&apos;t have an account? </Text>
-        <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-          <Text style={styles.regLink}>Register New Account</Text>
+        <TouchableOpacity
+          style={styles.regLink}
+          onPress={() => router.push("/(auth)/register")}
+        >
+          <Text style={styles.regLinkText}>
+            {t("auth.already_member", "Don't have an account?")}{" "}
+            <Text style={styles.regBold}>{t("auth.sign_in_now", "Register here")}</Text>
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Language Selection Modal */}
+      <Modal visible={showLangModal} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.langPickerCard}>
+            <Text style={styles.modalHeading}>
+              {t("header.select_lang", "Select Interface Language")}
+            </Text>
+            <Text style={styles.modalSubheading}>தமிழ்நாடு தொழிலாளர் கூட்டுறவு தளம்</Text>
+
+            <View style={styles.langPresetList}>
+              {SUPPORTED_LANGUAGES.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[styles.langItem, lang === item.code && styles.langItemActive]}
+                  onPress={() => {
+                    setLang(item.code);
+                    setShowLangModal(false);
+                  }}
+                >
+                  <View>
+                    <Text style={[styles.langText, lang === item.code && styles.langTextActive]}>
+                      {item.label}
+                    </Text>
+                    <Text style={styles.langNativeText}>{item.native}</Text>
+                  </View>
+                  {lang === item.code && <Check size={16} color="#059669" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setShowLangModal(false)}
+            >
+              <Text style={styles.cancelBtnText}>{t("header.close", "Close")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -126,153 +216,244 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: colors.surface.pageBg,
   },
   content: {
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 40,
   },
+  topNavRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
   backBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 20,
+    gap: 4,
   },
   backText: {
-    fontSize: 14,
-    color: "#065f46",
+    fontSize: 12.5,
     fontWeight: "bold",
+    color: colors.brand.primary,
   },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radii.md,
+  },
+  langBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#065F46",
+  },
+
   header: {
-    marginBottom: 24,
+    alignItems: "center",
+    marginBottom: 20,
   },
   logoBadge: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: "#d1fae5",
+    width: 48,
+    height: 48,
+    borderRadius: radii.xl,
+    backgroundColor: colors.brand.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
+    marginBottom: 10,
+    ...shadows.card,
+  },
+  logoIcon: {
+    fontSize: 24,
+    color: "#FDE68A",
+    fontWeight: "bold",
   },
   title: {
     fontSize: 22,
-    fontWeight: "bold",
-    color: "#0f172a",
+    fontWeight: "900",
+    color: colors.text.primary,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 12.5,
-    color: "#64748b",
+    fontSize: 12,
+    color: colors.text.secondary,
+    textAlign: "center",
     marginTop: 4,
-    lineHeight: 18,
+    maxWidth: 280,
+    lineHeight: 16,
   },
   formCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 20,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: colors.surface.border,
+    ...shadows.card,
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#334155",
-    marginBottom: 6,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  inputIcon: {
-    marginRight: 8,
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   input: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#0f172a",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12.5,
+    color: colors.text.primary,
+    marginBottom: 14,
   },
   submitBtn: {
-    backgroundColor: "#065f46",
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 12,
+    borderRadius: radii.lg,
     alignItems: "center",
-    marginTop: 6,
+    ...shadows.elevated,
   },
   submitBtnText: {
-    fontSize: 14,
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "bold",
-    color: "#ffffff",
   },
-  quickCard: {
-    backgroundColor: "#f0fdf4",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    marginBottom: 20,
+  demoDivider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 16,
   },
-  quickTitle: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: "#065f46",
-    textAlign: "center",
+  demoHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 10,
-    textTransform: "uppercase",
   },
-  quickRow: {
+  demoHeader: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+  },
+  instantPill: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: radii.sm,
+  },
+  instantPillText: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  demoGrid: {
     flexDirection: "row",
     gap: 8,
+    marginBottom: 16,
   },
-  quickBtn: {
+  demoCard: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    backgroundColor: "#ffffff",
-    paddingVertical: 9,
-    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    padding: 10,
   },
-  quickWorkerBtn: {
-    borderColor: "#bae6fd",
-  },
-  quickBtnText: {
-    fontSize: 11,
+  demoCardRole: {
+    fontSize: 11.5,
     fontWeight: "bold",
-    color: "#065f46",
+    color: colors.text.primary,
   },
-  quickWorkerText: {
-    color: "#0284c7",
-  },
-  registerLinkRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  regText: {
-    fontSize: 12.5,
-    color: "#64748b",
+  demoCardName: {
+    fontSize: 9.5,
+    color: colors.text.muted,
+    marginTop: 2,
   },
   regLink: {
+    alignItems: "center",
+  },
+  regLinkText: {
+    fontSize: 11.5,
+    color: colors.text.secondary,
+  },
+  regBold: {
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  langPickerCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 20,
+    ...shadows.elevated,
+  },
+  modalHeading: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  modalSubheading: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 3,
+    marginBottom: 14,
+  },
+  langPresetList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  langItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  langItemActive: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+  },
+  langText: {
+    fontSize: 13,
+    color: colors.text.primary,
+    fontWeight: "600",
+  },
+  langTextActive: {
+    color: colors.brand.primary,
+    fontWeight: "700",
+  },
+  langNativeText: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 2,
+  },
+  cancelBtn: {
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: radii.lg,
+  },
+  cancelBtnText: {
     fontSize: 12.5,
     fontWeight: "bold",
-    color: "#065f46",
-    textDecorationLine: "underline",
+    color: colors.text.secondary,
   },
 });

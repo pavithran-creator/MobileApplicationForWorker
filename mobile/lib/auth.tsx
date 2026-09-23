@@ -117,24 +117,24 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
         // Fallback demo user if network or seed profile not present
         const isWorker = cleanPhone === "9010000001";
         appUser = {
-          id: isWorker ? "w-01" : "c-01",
+          id: isWorker ? 1 : 11,
           name: isWorker ? "Suresh Kumar" : "Meena Sundaram",
           phone: cleanPhone,
           role: isWorker ? "WORKER" : "CUSTOMER",
           worker_id: isWorker ? 1 : undefined,
-          customer_id: isWorker ? undefined : 1,
+          customer_id: isWorker ? undefined : 11,
           address: isWorker ? "Royapettah, Chennai" : "14 Anna Nagar, Chennai",
         };
       }
     } catch {
       const isWorker = cleanPhone === "9010000001";
       appUser = {
-        id: isWorker ? "w-01" : "c-01",
+        id: isWorker ? 1 : 11,
         name: isWorker ? "Suresh Kumar" : "Meena Sundaram",
         phone: cleanPhone,
         role: isWorker ? "WORKER" : "CUSTOMER",
         worker_id: isWorker ? 1 : undefined,
-        customer_id: isWorker ? undefined : 1,
+        customer_id: isWorker ? undefined : 11,
         address: isWorker ? "Royapettah, Chennai" : "14 Anna Nagar, Chennai",
       };
     }
@@ -143,6 +143,8 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
 
     await AsyncStorage.setItem("ondemand_mobile_user", JSON.stringify(appUser));
     await AsyncStorage.setItem("ondemand_mobile_token", sessionToken);
+    await AsyncStorage.setItem("ondemand_user", JSON.stringify(appUser));
+    await AsyncStorage.setItem("ondemand_token", sessionToken);
 
     setUser(appUser);
     setToken(sessionToken);
@@ -157,6 +159,8 @@ export function MobileAuthProvider({ children }: { children: React.ReactNode }) 
   const logout = async () => {
     await AsyncStorage.removeItem("ondemand_mobile_user");
     await AsyncStorage.removeItem("ondemand_mobile_token");
+    await AsyncStorage.removeItem("ondemand_user");
+    await AsyncStorage.removeItem("ondemand_token");
     setUser(null);
     setToken(null);
   };

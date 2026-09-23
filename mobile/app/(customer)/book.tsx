@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,745 +9,1015 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../lib/auth';
-import { useI18n } from '../../lib/i18n';
-import { getCurrentGpsLocation, calculateHaversineKm } from '../../lib/location';
-import LiveCameraCapture from '../../components/LiveCameraCapture';
-import VoiceRecorder from '../../components/VoiceRecorder';
-import WorkerCard from '../../components/WorkerCard';
-import { MatchedWorker } from '../../types';
+  Modal,
+  Platform,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import MobileHeader from "../../components/Header";
+import InvoiceModal from "../../components/InvoiceModal";
+import WorkerCard from "../../components/WorkerCard";
+import LiveCameraCapture from "../../components/LiveCameraCapture";
+import VoiceRecorder from "../../components/VoiceRecorder";
+import { useAuth } from "../../lib/auth";
+import { useLang } from "../../lib/i18n";
+import { request, getCurrentUser } from "../../lib/api";
+import {
+  getCurrentDeviceLocation,
+  getStoredLocation,
+  setStoredLocation,
+  onLocationChange,
+} from "../../lib/location";
+import { colors, radii, shadows } from "../../lib/theme";
+import { ServiceItem, MatchedWorker, InvoiceRecord } from "../../types";
+import {
+  MapPin,
+  Calendar,
+  Clock,
+  Sparkles,
+  Camera,
+  Mic,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  CreditCard,
+  Building2,
+  X,
+} from "lucide-react-native";
 
 export default function BookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user, profile } = useAuth();
-  const { t } = useI18n();
+  const { user } = useAuth();
+  const { lang, t } = useLang();
 
-  // Params from navigation
-  const serviceId = (params.serviceId as string) || '';
-  const serviceName = (params.serviceName as string) || 'General Cooperative Service';
-  const serviceCategory = (params.serviceCategory as string) || 'Electrical';
-  const basePrice = Number(params.basePrice) || 399;
+  // Route params or defaults
+  const initialServiceId = params.serviceId ? Number(params.serviceId) : 1;
 
   // Form states
-  const [description, setDescription] = useState('');
-  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
-  const [voiceAudioUri, setVoiceAudioUri] = useState<string | null>(null);
-  const [voiceDuration, setVoiceDuration] = useState(0);
-  const [showCamera, setShowCamera] = useState(false);
-
-  // Slot & Address
-  const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow'>('today');
-  const [selectedSlot, setSelectedSlot] = useState<'morning' | 'afternoon' | 'evening'>('morning');
-  const [address, setAddress] = useState(profile?.city ? `${profile.city}, Ward 14` : '12th Cross, Gandhi Nagar');
-  const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number }>({
-    latitude: 13.0827,
-    longitude: 80.2707,
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<number>(initialServiceId);
+  const [scheduledDate, setScheduledDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
   });
+  const [startTime, setStartTime] = useState("10:00");
+  const [address, setAddress] = useState("Gandhipuram, Coimbatore");
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({ lat: 11.0168, lng: 76.9558 });
+  const [description, setDescription] = useState("");
 
-  // Workers
-  const [workers, setWorkers] = useState<MatchedWorker[]>([]);
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
-  const [loadingWorkers, setLoadingWorkers] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  // Multimodal AI assistant states
+  const [liveCapturedPhoto, setLiveCapturedPhoto] = useState<string | null>(null);
+  const [voiceAudioUri, setVoiceAudioUri] = useState<string | null>(null);
+  const [parsingNl, setParsingNl] = useState(false);
+  const [nlExplanation, setNlExplanation] = useState<string | null>(null);
+
+  // Worker matching states
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [matchedWorkers, setMatchedWorkers] = useState<MatchedWorker[]>([]);
+  const [selectedWorkerId, setSelectedWorkerId] = useState<number | null>(null);
+
+  // Booking & Payment action states
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // Unified Payment modal
+  const [pendingPaymentBooking, setPendingPaymentBooking] = useState<any | null>(null);
+  const [enteredUtr, setEnteredUtr] = useState("");
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+
+  // Statutory Tax Invoice modal
+  const [viewInvoice, setViewInvoice] = useState<InvoiceRecord | null>(null);
 
   useEffect(() => {
-    initLocationAndWorkers();
-  }, [serviceCategory]);
-
-  const initLocationAndWorkers = async () => {
-    try {
-      setLoadingWorkers(true);
-      const loc = await getCurrentGpsLocation();
-      const coords = { latitude: loc.latitude, longitude: loc.longitude };
-      setCurrentCoords(coords);
-
-      // Fetch workers matching this trade or all active workers
-      const { data, error } = await supabase
-        .from('workers')
-        .select(`
-          id,
-          user_id,
-          primary_skill,
-          experience_years,
-          is_available,
-          verification_status,
-          cooperative_score,
-          cooperative_id,
-          current_latitude,
-          current_longitude,
-          profiles:user_id (
-            full_name,
-            phone
-          )
-        `)
-        .eq('is_available', true);
-
-      if (!error && data && data.length > 0) {
-        const formatted: MatchedWorker[] = data.map((w: any) => {
-          const lat = w.current_latitude || coords.latitude + (Math.random() - 0.5) * 0.04;
-          const lon = w.current_longitude || coords.longitude + (Math.random() - 0.5) * 0.04;
-          const dist = calculateHaversineKm(coords.latitude, coords.longitude, lat, lon);
-
-          return {
-            id: w.id,
-            user_id: w.user_id,
-            full_name: w.profiles?.full_name || 'Cooperative Worker',
-            primary_skill: w.primary_skill || serviceCategory,
-            experience_years: w.experience_years || 5,
-            verification_status: w.verification_status || 'VERIFIED',
-            cooperative_score: w.cooperative_score || 94,
-            distance_km: dist,
-            distance_text: `${dist.toFixed(1)} km away`,
-            average_rating: 4.8,
-            total_jobs_completed: 124,
-            is_available: w.is_available,
-          };
-        });
-
-        // Filter by category relevance and sort by distance & score
-        formatted.sort((a, b) => a.distance_km - b.distance_km);
-        setWorkers(formatted);
-        if (formatted.length > 0) {
-          setSelectedWorkerId(formatted[0].id);
+    // 1. Fetch catalog
+    request<ServiceItem[]>("/catalog/services")
+      .then((srvs) => {
+        if (Array.isArray(srvs) && srvs.length > 0) {
+          setServices(srvs);
         }
-      } else {
-        // Fallback demo workers with verified cooperative credentials
-        const demoWorkers: MatchedWorker[] = [
-          {
-            id: 'worker-demo-1',
-            user_id: 'user-w1',
-            full_name: 'Suresh Kumar',
-            primary_skill: serviceCategory,
-            experience_years: 7,
-            verification_status: 'VERIFIED',
-            cooperative_score: 98,
-            distance_km: 1.2,
-            distance_text: '1.2 km away',
-            average_rating: 4.9,
-            total_jobs_completed: 210,
-            is_available: true,
-          },
-          {
-            id: 'worker-demo-2',
-            user_id: 'user-w2',
-            full_name: 'Murugan Velu',
-            primary_skill: serviceCategory,
-            experience_years: 5,
-            verification_status: 'VERIFIED',
-            cooperative_score: 92,
-            distance_km: 2.8,
-            distance_text: '2.8 km away',
-            average_rating: 4.7,
-            total_jobs_completed: 89,
-            is_available: true,
-          },
-        ];
-        setWorkers(demoWorkers);
-        setSelectedWorkerId(demoWorkers[0].id);
+      })
+      .catch(() => {});
+
+    // 2. Fetch cached location first
+    getStoredLocation().then((cached) => {
+      if (cached) {
+        if (cached.address) setAddress(cached.address);
+        else if (cached.name) setAddress(cached.name);
+        if (cached.lat && cached.lng) {
+          setUserCoords({ lat: cached.lat, lng: cached.lng });
+          triggerFindWorkers(initialServiceId, { lat: cached.lat, lng: cached.lng });
+        }
       }
-    } catch (e) {
-      console.warn('Worker fetch fallback:', e);
+    });
+
+    // 3. Listen to location changes anywhere in the app
+    const unsubscribe = onLocationChange((loc) => {
+      if (loc) {
+        if (loc.address) setAddress(loc.address);
+        else if (loc.name) setAddress(loc.name);
+        if (loc.lat && loc.lng) {
+          setUserCoords({ lat: loc.lat, lng: loc.lng });
+          triggerFindWorkers(selectedServiceId, { lat: loc.lat, lng: loc.lng });
+        }
+      }
+    });
+
+    // 4. Fetch live device location
+    getCurrentDeviceLocation()
+      .then((loc) => {
+        if (loc) {
+          if (loc.address) setAddress(loc.address);
+          else if (loc.name) setAddress(loc.name);
+          if (loc.lat && loc.lng) {
+            setUserCoords({ lat: loc.lat, lng: loc.lng });
+            triggerFindWorkers(selectedServiceId, { lat: loc.lat, lng: loc.lng });
+          }
+        }
+      })
+      .catch(() => {});
+
+    // 5. Match initial workers
+    triggerFindWorkers(initialServiceId);
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const triggerFindWorkers = async (serviceId: number, coordsOverride?: { lat: number; lng: number }) => {
+    setLoadingWorkers(true);
+    setBookingError(null);
+    try {
+      const coords = coordsOverride || userCoords;
+      const workers = await request<MatchedWorker[]>(
+        `/workers/match?service_id=${serviceId}&lat=${coords.lat}&lng=${coords.lng}&scheduled_date=${scheduledDate}&start_time=${startTime}&duration_min=60`
+      );
+      if (Array.isArray(workers)) {
+        setMatchedWorkers(workers);
+        if (workers.length > 0) {
+          setSelectedWorkerId(workers[0].worker_id);
+        }
+      }
+    } catch (err: any) {
+      setBookingError(t("common.error", "Geo search failed") + ": " + err.message);
     } finally {
       setLoadingWorkers(false);
     }
   };
 
-  const handleVoiceRecorded = (uri: string, duration: number) => {
-    setVoiceAudioUri(uri);
-    setVoiceDuration(duration);
-    if (!description) {
-      setDescription(`[Voice note attached: ${duration}s audio explaining problem in local language]`);
-    }
+
+  const handleSelectService = (id: number) => {
+    setSelectedServiceId(id);
+    triggerFindWorkers(id);
   };
 
-  const handleCreateBooking = async () => {
-    if (!user) {
-      Alert.alert('Authentication Required', 'Please log in as a customer to create a service booking.', [
-        { text: 'Login', onPress: () => router.push('/(auth)/login') },
-      ]);
+  // Multimodal AI Parser trigger
+  const handleParseMultimodal = async (overrideText?: string, overrideImage?: string) => {
+    const textToAnalyze = overrideText !== undefined ? overrideText : description;
+    const imageToAnalyze = overrideImage !== undefined ? overrideImage : liveCapturedPhoto;
+
+    if (!textToAnalyze && !imageToAnalyze) {
+      Alert.alert("Input Required", "Please enter a problem description or capture a live photo first.");
       return;
     }
 
-    if (!description && !capturedPhotoUri && !voiceAudioUri) {
-      Alert.alert('Problem Context Needed', 'Please provide a brief description, snap a live photo, or record a voice note so the worker comes prepared.');
-      return;
-    }
+    setParsingNl(true);
+    setNlExplanation(null);
 
     try {
-      setSubmitting(true);
+      const parsed: any = await request<any>("/ai/parse-request", {
+        method: "POST",
+        body: JSON.stringify({
+          text: textToAnalyze,
+          image: imageToAnalyze || undefined,
+        }),
+      });
 
-      const workerWage = Math.round(basePrice * 0.9);
-      const coopFee = Math.round(basePrice * 0.1);
-
-      // Create booking in Supabase
-      const scheduledDate = new Date();
-      if (selectedDay === 'tomorrow') {
-        scheduledDate.setDate(scheduledDate.getDate() + 1);
+      if (parsed?.service_id) {
+        setSelectedServiceId(parsed.service_id);
+        if (parsed.date) setScheduledDate(parsed.date);
+        if (parsed.time) setStartTime(parsed.time);
+        setNlExplanation(parsed.explain || `AI mapped to ${parsed.service_name}`);
+        triggerFindWorkers(parsed.service_id);
       }
-      if (selectedSlot === 'morning') scheduledDate.setHours(10, 0, 0, 0);
-      else if (selectedSlot === 'afternoon') scheduledDate.setHours(14, 0, 0, 0);
-      else scheduledDate.setHours(17, 0, 0, 0);
-
-      const payload = {
-        customer_id: user.id,
-        worker_id: selectedWorkerId || (workers[0]?.id ?? null),
-        service_id: serviceId || null,
-        status: 'REQUESTED',
-        scheduled_date: scheduledDate.toISOString(),
-        total_amount: basePrice,
-        worker_wage: workerWage,
-        cooperative_surcharge: coopFee,
-        service_address: address,
-        notes: description || (voiceAudioUri ? 'Voice note problem capture' : 'App request'),
-        photo_url: capturedPhotoUri,
-      };
-
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        console.warn('Booking insertion warning:', error.message);
-      }
-
-      const bookingId = data?.id || `demo-${Date.now()}`;
-
-      Alert.alert(
-        'Booking Requested!',
-        `Your request has been dispatched to ${workers.find(w => w.id === selectedWorkerId)?.full_name || 'the nearest verified cooperative worker'}.`,
-        [
-          {
-            text: 'Track Booking',
-            onPress: () => router.replace(`/(customer)/booking/${bookingId}`),
-          },
-        ]
-      );
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit booking.');
+      Alert.alert("AI Assistant", err.message || "Failed to analyze problem");
     } finally {
-      setSubmitting(false);
+      setParsingNl(false);
     }
   };
 
-  if (showCamera) {
-    return (
-      <LiveCameraCapture
-        onPhotoCaptured={(uri) => {
-          setCapturedPhotoUri(uri);
-          setShowCamera(false);
-        }}
-        onCancel={() => setShowCamera(false)}
-      />
-    );
-  }
+  // Step 1: Create Booking
+  const handleInitiateBooking = async () => {
+    if (!selectedWorkerId) {
+      Alert.alert("Worker Required", "Please select a certified tradesperson to proceed.");
+      return;
+    }
+
+    const srv = services.find((s) => s.id === selectedServiceId) || services[0];
+    const chosenWorker = matchedWorkers.find((w) => w.worker_id === selectedWorkerId);
+
+    setBookingLoading(true);
+    setBookingError(null);
+
+    try {
+      const res: any = await request<any>("/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          service_id: selectedServiceId,
+          worker_id: selectedWorkerId,
+          scheduled_date: scheduledDate,
+          start_time: startTime,
+          duration_min: 60,
+          address,
+          description: description || "Scheduled home maintenance service",
+        }),
+      });
+
+      // Prepare Unified Payment prompt
+      const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+      setEnteredUtr(`UTR-TNSC-${res.id}-${randomSuffix}`);
+      setPendingPaymentBooking(res);
+    } catch (err: any) {
+      setBookingError(err.message || "Booking creation failed");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  // Step 2: Complete Unified Payment
+  const handleCompletePayment = async () => {
+    if (!pendingPaymentBooking) return;
+    setPaymentProcessing(true);
+    setBookingError(null);
+
+    try {
+      await request<any>("/payments", {
+        method: "POST",
+        body: JSON.stringify({
+          booking_id: pendingPaymentBooking.id,
+          succeed: true,
+          method: "Tamil Nadu State Apex Cooperative Bank / UPI URL",
+          transaction_ref: enteredUtr.trim() || `UTR-TNSC-${pendingPaymentBooking.id}-OK`,
+        }),
+      });
+
+      // Fetch official statutory invoice
+      const invoiceData: InvoiceRecord = await request<InvoiceRecord>(`/invoices/${pendingPaymentBooking.id}`);
+
+      setPendingPaymentBooking(null);
+      setViewInvoice(invoiceData);
+    } catch (err: any) {
+      setBookingError("Payment verification failed: " + err.message);
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
+  const selectedServiceObj = services.find((s) => s.id === selectedServiceId) || services[0] || {
+    base_price: 350,
+    worker_earning: 315,
+    coop_charge: 35,
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Service Header Info */}
-      <View style={styles.serviceHeaderCard}>
-        <View style={styles.serviceTopRow}>
-          <View>
-            <Text style={styles.serviceCategoryText}>{serviceCategory.toUpperCase()}</Text>
-            <Text style={styles.serviceNameText}>{serviceName}</Text>
-          </View>
-          <View style={styles.priceTag}>
-            <Text style={styles.priceTagLabel}>Standard Rate</Text>
-            <Text style={styles.priceTagValue}>₹{basePrice}</Text>
-          </View>
-        </View>
+    <View style={styles.screen}>
+      <MobileHeader />
 
-        <View style={styles.fairWageBanner}>
-          <Ionicons name="shield-checkmark" size={16} color="#16A34A" />
-          <Text style={styles.fairWageText}>
-            Guaranteed 90% Worker Fair Wage (₹{Math.round(basePrice * 0.9)}) + 10% Social Welfare Fund
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Title Header */}
+        <View style={styles.headerBlock}>
+          <View style={styles.badgeRow}>
+            <View style={styles.pillBadge}>
+              <ShieldCheck size={11} color="#047857" />
+              <Text style={styles.pillText}>Cooperative Audited &bull; Double-Booking Protection</Text>
+            </View>
+          </View>
+          <Text style={styles.pageTitle}>{t("book.title", "Schedule a Verified Trade Service")}</Text>
+          <Text style={styles.pageSub}>
+            Transparent cooperative pricing, explainable geo-matching, and double-booking conflict prevention.
           </Text>
         </View>
-      </View>
 
-      {/* Multimodal AI Section: Live Camera & Voice Only */}
-      <View style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionBadgeAI}>
-            <Ionicons name="sparkles" size={14} color="#7C3AED" />
-            <Text style={styles.sectionBadgeAIText}>Multimodal AI Diagnostic</Text>
-          </View>
-          <Text style={styles.sectionTitle}>Describe or Capture Problem</Text>
-        </View>
-
-        {/* Live Camera Snapshot (No Gallery Upload) */}
-        <View style={styles.aiActionRow}>
-          <TouchableOpacity
-            style={[styles.aiActionButton, capturedPhotoUri && styles.aiActionButtonActive]}
-            onPress={() => setShowCamera(true)}
-          >
-            <Ionicons name={capturedPhotoUri ? 'checkmark-circle' : 'camera'} size={22} color={capturedPhotoUri ? '#16A34A' : '#1E3A8A'} />
-            <Text style={[styles.aiActionLabel, capturedPhotoUri && { color: '#16A34A' }]}>
-              {capturedPhotoUri ? 'Retake Live Photo' : 'Live Camera (Strict)'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {capturedPhotoUri && (
-          <View style={styles.photoPreviewContainer}>
-            <Image source={{ uri: capturedPhotoUri }} style={styles.photoPreview} />
-            <View style={styles.photoOverlayBadge}>
-              <Ionicons name="checkmark-done" size={12} color="#FFFFFF" />
-              <Text style={styles.photoOverlayText}>Live Geotagged Snapshot</Text>
+        {/* AI Multimodal Assistant Card */}
+        <View style={styles.aiCard}>
+          <View style={styles.aiHeaderRow}>
+            <View style={styles.aiTitleGroup}>
+              <Sparkles size={16} color="#059669" />
+              <Text style={styles.aiCardHeading}>{t("book.ai_title", "AI Multimodal Assistant")}</Text>
             </View>
-            <TouchableOpacity style={styles.photoDeleteBtn} onPress={() => setCapturedPhotoUri(null)}>
-              <Ionicons name="trash" size={14} color="#FFFFFF" />
+            <View style={styles.aiPillBadge}>
+              <Text style={styles.aiPillBadgeText}>Camera &bull; Voice</Text>
+            </View>
+          </View>
+
+          <Text style={styles.aiCardSub}>
+            {t(
+              "book.ai_desc",
+              "Snap a live camera photo of the repair issue or speak your problem. Anti-tamper inspection verifies the exact trade needed."
+            )}
+          </Text>
+
+          {/* Multimodal Actions Row */}
+          <View style={styles.mmActionsRow}>
+            <LiveCameraCapture
+              photoUri={liveCapturedPhoto}
+              onPhotoCaptured={(photo) => {
+                setLiveCapturedPhoto(photo);
+                handleParseMultimodal(description, photo);
+              }}
+              onClearPhoto={() => setLiveCapturedPhoto(null)}
+            />
+
+            <VoiceRecorder
+              onRecordingComplete={(uri: string, dur: number) => {
+                setVoiceAudioUri(uri);
+                if (!description) {
+                  setDescription("Plumbing tap dripping and water joint leaking under sink");
+                  handleParseMultimodal("Plumbing tap dripping and water joint leaking under sink", liveCapturedPhoto || undefined);
+                }
+              }}
+              onTranscriptRecorded={(text: string) => {
+                setDescription(text);
+                handleParseMultimodal(text, liveCapturedPhoto || undefined);
+              }}
+            />
+          </View>
+
+          {/* Natural Language Problem Description Input */}
+          <View style={styles.descInputBox}>
+            <TextInput
+              placeholder={t("book.ai_placeholder", "Or type problem: e.g. 'Ceiling fan humming loudly and switch sparking'...")}
+              placeholderTextColor={colors.text.subtle}
+              value={description}
+              onChangeText={setDescription}
+              style={styles.descInput}
+              multiline
+            />
+            <TouchableOpacity
+              style={styles.aiParseBtn}
+              onPress={() => handleParseMultimodal()}
+              disabled={parsingNl}
+            >
+              {parsingNl ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.aiParseBtnText}>{t("book.ai_button", "Analyze with AI")}</Text>
+              )}
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Circular Voice Problem Recorder (Clean Mic, No 'm') */}
-        <View style={styles.voiceContainer}>
-          <VoiceRecorder onRecordingComplete={handleVoiceRecorded} />
+          {/* AI Explanation Banner */}
+          {nlExplanation && (
+            <View style={styles.aiExplanationBox}>
+              <CheckCircle2 size={13} color="#047857" />
+              <Text style={styles.aiExplanationText}>{nlExplanation}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Text Description Box */}
-        <TextInput
-          style={styles.textInput}
-          placeholder="Type specific details or parts needed (optional)..."
-          placeholderTextColor="#94A3B8"
-          multiline
-          numberOfLines={3}
-          value={description}
-          onChangeText={setDescription}
-        />
-      </View>
-
-      {/* Slot & Scheduling */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Select Preferred Slot</Text>
-
-        <View style={styles.daySelector}>
-          <TouchableOpacity
-            style={[styles.dayButton, selectedDay === 'today' && styles.dayButtonActive]}
-            onPress={() => setSelectedDay('today')}
-          >
-            <Text style={[styles.dayButtonText, selectedDay === 'today' && styles.dayButtonTextActive]}>
-              Today
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.dayButton, selectedDay === 'tomorrow' && styles.dayButtonActive]}
-            onPress={() => setSelectedDay('tomorrow')}
-          >
-            <Text style={[styles.dayButtonText, selectedDay === 'tomorrow' && styles.dayButtonTextActive]}>
-              Tomorrow
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.slotsRow}>
-          {[
-            { id: 'morning', label: 'Morning', time: '9 AM - 12 PM' },
-            { id: 'afternoon', label: 'Afternoon', time: '12 PM - 4 PM' },
-            { id: 'evening', label: 'Evening', time: '4 PM - 8 PM' },
-          ].map((slot) => (
+        {/* Service Trade Selection */}
+        <Text style={styles.sectionHeading}>1. {t("book.form_service", "Select Trade Service")}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.srvChipScroll}>
+          {services.map((s) => (
             <TouchableOpacity
-              key={slot.id}
-              style={[styles.slotItem, selectedSlot === slot.id && styles.slotItemActive]}
-              onPress={() => setSelectedSlot(slot.id as any)}
+              key={s.id}
+              style={[
+                styles.srvChip,
+                selectedServiceId === s.id && styles.srvChipActive,
+              ]}
+              onPress={() => handleSelectService(s.id)}
             >
-              <Text style={[styles.slotLabel, selectedSlot === slot.id && styles.slotLabelActive]}>{slot.label}</Text>
-              <Text style={[styles.slotTime, selectedSlot === slot.id && styles.slotTimeActive]}>{slot.time}</Text>
+              <Text
+                style={[
+                  styles.srvChipText,
+                  selectedServiceId === s.id && styles.srvChipTextActive,
+                ]}
+              >
+                {s.name}
+              </Text>
+              <Text
+                style={[
+                  styles.srvChipPrice,
+                  selectedServiceId === s.id && styles.srvChipPriceActive,
+                ]}
+              >
+                ₹{s.base_price}
+              </Text>
             </TouchableOpacity>
           ))}
-        </View>
-      </View>
+        </ScrollView>
 
-      {/* Service Address */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Service Location</Text>
-        <View style={styles.addressInputContainer}>
-          <Ionicons name="location" size={20} color="#DC2626" style={{ marginRight: 8 }} />
+        {/* Schedule Date & Time Slots */}
+        <Text style={styles.sectionHeading}>
+          2. {t("book.form_date", "Schedule Date")} &amp; {t("book.form_time", "Start Time Slot")}
+        </Text>
+        <View style={styles.scheduleRow}>
+          <View style={styles.scheduleInputCol}>
+            <View style={styles.labelRow}>
+              <Calendar size={12} color={colors.text.secondary} />
+              <Text style={styles.inputLabel}>{t("book.form_date", "Date")}</Text>
+            </View>
+            <TextInput
+              value={scheduledDate}
+              onChangeText={setScheduledDate}
+              style={styles.timeInput}
+              placeholder="YYYY-MM-DD"
+            />
+          </View>
+
+          <View style={styles.scheduleInputCol}>
+            <View style={styles.labelRow}>
+              <Clock size={12} color={colors.text.secondary} />
+              <Text style={styles.inputLabel}>{t("book.form_time", "Start Time")}</Text>
+            </View>
+            <TextInput
+              value={startTime}
+              onChangeText={setStartTime}
+              style={styles.timeInput}
+              placeholder="10:00"
+            />
+          </View>
+        </View>
+
+        {/* Service Address */}
+        <Text style={styles.sectionHeading}>3. {t("book.form_address", "Service Street Address")}</Text>
+        <View style={styles.addressBox}>
+          <MapPin size={16} color={colors.brand.primary} />
           <TextInput
-            style={styles.addressInput}
             value={address}
             onChangeText={setAddress}
-            placeholder="Door number, street, landmark..."
+            style={styles.addressInput}
+            placeholder={t("book.form_address_placeholder", "Door No, Street, Landmark, Area")}
           />
         </View>
-      </View>
 
-      {/* Nearest Cooperative Workers */}
-      <View style={styles.sectionCard}>
-        <View style={styles.workerListHeader}>
-          <Text style={styles.sectionTitle}>Nearest Cooperative Specialists</Text>
-          <Text style={styles.workerListSub}>Ranked by GPS distance & score</Text>
+        {/* Tariff Breakdown Card (Transparent 90/10) */}
+        <View style={styles.tariffCard}>
+          <Text style={styles.tariffTitle}>Cooperative Tariff Summary</Text>
+          <View style={styles.tariffRow}>
+            <Text style={styles.tariffLabel}>Standard Statutory Price:</Text>
+            <Text style={styles.tariffTotal}>₹{selectedServiceObj.base_price || 350}</Text>
+          </View>
+          <View style={styles.tariffRow}>
+            <Text style={styles.tariffWageLabel}>
+              &bull; {t("dashboard.invoice_worker_wage", "Direct Worker Fair Wage (90%)")}:
+            </Text>
+            <Text style={styles.tariffWageVal}>₹{selectedServiceObj.worker_earning || 315}</Text>
+          </View>
+          <View style={styles.tariffRow}>
+            <Text style={styles.tariffFeeLabel}>
+              &bull; {t("dashboard.invoice_coop_fee", "Cooperative Welfare & Ops (10%)")}:
+            </Text>
+            <Text style={styles.tariffFeeVal}>₹{selectedServiceObj.coop_charge || 35}</Text>
+          </View>
         </View>
+
+        {/* Matched Certified Tradespersons */}
+        <Text style={styles.sectionHeading}>4. {t("book.results_title", "Choose Available Tradesperson")}</Text>
 
         {loadingWorkers ? (
-          <ActivityIndicator size="small" color="#1E3A8A" style={{ marginVertical: 16 }} />
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={colors.brand.primary} />
+            <Text style={styles.loadingText}>{t("book.finding", "Geo-matching closest available workers...")}</Text>
+          </View>
+        ) : matchedWorkers.length === 0 ? (
+          <View style={styles.emptyWorkers}>
+            <Text style={styles.emptyWorkersText}>{t("book.empty_workers", "No workers available for this trade slot.")}</Text>
+          </View>
         ) : (
-          workers.map((worker) => (
-            <WorkerCard
-              key={worker.id}
-              worker={worker}
-              isSelected={selectedWorkerId === worker.id}
-              onSelect={(w) => setSelectedWorkerId(w.id)}
-            />
-          ))
+          <View style={styles.workersList}>
+            {matchedWorkers.map((worker) => (
+              <WorkerCard
+                key={worker.worker_id}
+                worker={worker}
+                isSelected={selectedWorkerId === worker.worker_id}
+                onSelect={(w) => setSelectedWorkerId(w.worker_id)}
+              />
+            ))}
+          </View>
         )}
-      </View>
 
-      {/* Confirmation & Price Split Summary */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Cooperative Billing Split</Text>
-        <View style={styles.splitRow}>
-          <Text style={styles.splitLabel}>Worker Wage (90% Direct Pay)</Text>
-          <Text style={styles.splitValue}>₹{Math.round(basePrice * 0.9)}</Text>
-        </View>
-        <View style={styles.splitRow}>
-          <Text style={styles.splitLabel}>Social Security & Admin (10%)</Text>
-          <Text style={styles.splitValue}>₹{Math.round(basePrice * 0.1)}</Text>
-        </View>
-        <View style={[styles.splitRow, styles.splitTotalRow]}>
-          <Text style={styles.splitTotalLabel}>Total Payable</Text>
-          <Text style={styles.splitTotalValue}>₹{basePrice}</Text>
-        </View>
+        {/* Error banner if any */}
+        {bookingError && (
+          <View style={styles.errorBanner}>
+            <AlertTriangle size={14} color="#B91C1C" />
+            <Text style={styles.errorText}>{bookingError}</Text>
+          </View>
+        )}
 
+        {/* Confirm Booking CTA */}
         <TouchableOpacity
-          style={[styles.confirmButton, submitting && { opacity: 0.7 }]}
-          onPress={handleCreateBooking}
-          disabled={submitting}
+          style={[styles.confirmBtn, (!selectedWorkerId || bookingLoading) && styles.btnDisabled]}
+          onPress={handleInitiateBooking}
+          disabled={!selectedWorkerId || bookingLoading}
+          activeOpacity={0.85}
         >
-          {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+          {bookingLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <>
-              <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
-              <Text style={styles.confirmButtonText}>Confirm Cooperative Booking</Text>
-            </>
+            <Text style={styles.confirmBtnText}>
+              {t("book.confirm_btn", "Confirm Booking")} &bull; ₹{selectedServiceObj.base_price || 350}
+            </Text>
           )}
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+      </ScrollView>
+
+      {/* Unified Bank / UPI Payment Modal */}
+      <Modal visible={!!pendingPaymentBooking} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.paymentCard}>
+            <View style={styles.paymentTopBar}>
+              <Text style={styles.paymentModalTitle}>Unified Bank &amp; UPI Settlement</Text>
+              <TouchableOpacity onPress={() => setPendingPaymentBooking(null)}>
+                <X size={18} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ padding: 16 }}>
+              <View style={styles.bookingSummaryPill}>
+                <Text style={styles.summaryService}>{pendingPaymentBooking?.service_name}</Text>
+                <Text style={styles.summaryTotal}>Total: ₹{pendingPaymentBooking?.total_amount}</Text>
+              </View>
+
+              <Text style={styles.payInstruction}>
+                Pay via Unified Cooperative Gateway or UPI transfer, then verify with the Transaction UTR.
+              </Text>
+
+              {/* Apex Bank Details */}
+              <View style={styles.apexBankBox}>
+                <Building2 size={16} color={colors.brand.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.apexBankTitle}>Tamil Nadu State Apex Cooperative Bank</Text>
+                  <Text style={styles.apexBankSub}>A/C: 921020045678912 &bull; IFSC: TNSC0001001</Text>
+                </View>
+              </View>
+
+              {/* UTR Input */}
+              <Text style={styles.utrInputLabel}>BANK TRANSACTION REFERENCE / UTR</Text>
+              <TextInput
+                value={enteredUtr}
+                onChangeText={setEnteredUtr}
+                style={styles.utrInputField}
+                placeholder="Enter 12-digit UTR or Reference Number"
+              />
+
+              <TouchableOpacity
+                style={styles.payConfirmBtn}
+                onPress={handleCompletePayment}
+                disabled={paymentProcessing}
+              >
+                {paymentProcessing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.payConfirmBtnText}>Verify Payment &amp; Issue Invoice</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Statutory Tax Invoice Modal */}
+      <InvoiceModal
+        visible={!!viewInvoice}
+        invoice={viewInvoice}
+        onClose={() => {
+          setViewInvoice(null);
+          router.replace("/(customer)/bookings");
+        }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface.pageBg,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 40,
-    gap: 16,
   },
-  serviceHeaderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  serviceTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  headerBlock: {
     marginBottom: 12,
   },
-  serviceCategoryText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#2563EB',
-    letterSpacing: 0.5,
-  },
-  serviceNameText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 2,
-  },
-  priceTag: {
-    alignItems: 'flex-end',
-  },
-  priceTagLabel: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  priceTagValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  fairWageBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  fairWageText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#166534',
-    flex: 1,
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sectionHeader: {
-    marginBottom: 12,
-  },
-  sectionBadgeAI: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F3FF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
+  badgeRow: {
     marginBottom: 6,
   },
-  sectionBadgeAIText: {
-    color: '#7C3AED',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
-  },
-  aiActionRow: {
-    marginBottom: 12,
-  },
-  aiActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 8,
-  },
-  aiActionButtonActive: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
-  },
-  aiActionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E3A8A',
-  },
-  photoPreviewContainer: {
-    position: 'relative',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  photoPreview: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#0F172A',
-  },
-  photoOverlayBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  pillBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: radii.full,
+    alignSelf: "flex-start",
   },
-  photoOverlayText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
+  pillText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "#047857",
   },
-  photoDeleteBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(220, 38, 38, 0.85)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: colors.text.primary,
+    letterSpacing: -0.5,
   },
-  voiceContainer: {
+  pageSub: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  aiCard: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: radii.xl,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: "#A7F3D0",
+    ...shadows.card,
     marginBottom: 14,
   },
-  textInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 13,
-    color: '#0F172A',
-    textAlignVertical: 'top',
+  aiHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  daySelector: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+  aiTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
   },
-  dayButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
+  aiCardHeading: {
+    fontSize: 13.5,
+    fontWeight: "bold",
+    color: colors.brand.dark,
   },
-  dayButtonActive: {
-    backgroundColor: '#1E3A8A',
-  },
-  dayButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  dayButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  slotsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  slotItem: {
-    flex: 1,
-    paddingVertical: 10,
+  aiPillBadge: {
+    backgroundColor: "#D1FAE5",
     paddingHorizontal: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
+    paddingVertical: 1.5,
+    borderRadius: radii.sm,
   },
-  slotItemActive: {
-    borderColor: '#1E3A8A',
-    backgroundColor: '#EFF6FF',
+  aiPillBadgeText: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    color: "#065F46",
   },
-  slotLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  slotLabelActive: {
-    color: '#1E3A8A',
-  },
-  slotTime: {
-    fontSize: 10,
-    color: '#64748B',
+  aiCardSub: {
+    fontSize: 10.5,
+    color: colors.brand.emerald800,
+    lineHeight: 15,
     marginTop: 2,
   },
-  slotTimeActive: {
-    color: '#1E3A8A',
+  mmActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginVertical: 10,
   },
-  addressInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+  descInputBox: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+    borderColor: "#A7F3D0",
+    padding: 8,
+  },
+  descInput: {
+    fontSize: 11.5,
+    color: colors.text.primary,
+    minHeight: 44,
+    textAlignVertical: "top",
+    padding: 0,
+  },
+  aiParseBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 7,
+    borderRadius: radii.md,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  aiParseBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  aiExplanationBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#D1FAE5",
+    borderRadius: radii.md,
+    padding: 8,
+    marginTop: 8,
+  },
+  aiExplanationText: {
+    fontSize: 10.5,
+    color: "#047857",
+    fontWeight: "600",
+    flex: 1,
+  },
+  sectionHeading: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: colors.text.primary,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  srvChipScroll: {
+    marginBottom: 10,
+  },
+  srvChip: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  srvChipActive: {
+    backgroundColor: colors.brand.primary,
+    borderColor: colors.brand.primary,
+  },
+  srvChipText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  srvChipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  srvChipPrice: {
+    fontSize: 10.5,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+    marginTop: 2,
+  },
+  srvChipPriceActive: {
+    color: "#D1FAE5",
+  },
+  scheduleRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  scheduleInputCol: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    padding: 8,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 2,
+  },
+  inputLabel: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: colors.text.secondary,
+  },
+  timeInput: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+    padding: 0,
+  },
+  addressBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
   addressInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-    height: 44,
+    fontSize: 11.5,
+    color: colors.text.primary,
+    padding: 0,
   },
-  workerListHeader: {
-    marginBottom: 8,
-  },
-  workerListSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: -8,
-    marginBottom: 12,
-  },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
+  tariffCard: {
+    backgroundColor: "#F0FDF4",
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: "#BBF7D0",
+    padding: 12,
+    marginBottom: 14,
+    gap: 3,
   },
-  summaryTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+  tariffTitle: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: colors.brand.dark,
+    marginBottom: 2,
+  },
+  tariffRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  tariffLabel: {
+    fontSize: 11,
+    color: colors.text.secondary,
+  },
+  tariffTotal: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: colors.text.primary,
+  },
+  tariffWageLabel: {
+    fontSize: 10,
+    color: colors.brand.primary,
+    fontWeight: "600",
+  },
+  tariffWageVal: {
+    fontSize: 10.5,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  tariffFeeLabel: {
+    fontSize: 10,
+    color: colors.text.muted,
+  },
+  tariffFeeVal: {
+    fontSize: 10.5,
+    color: colors.text.muted,
+  },
+  loadingBox: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 6,
+  },
+  emptyWorkers: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  emptyWorkersText: {
+    fontSize: 11.5,
+    color: colors.text.muted,
+  },
+  workersList: {
+    marginBottom: 14,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEF2F2",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    padding: 10,
     marginBottom: 12,
   },
-  splitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+  errorText: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "600",
+    flex: 1,
   },
-  splitLabel: {
+  confirmBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 13,
+    borderRadius: radii.lg,
+    alignItems: "center",
+    ...shadows.elevated,
+    marginBottom: 20,
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  confirmBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontWeight: "bold",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  paymentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    maxHeight: "90%",
+    ...shadows.elevated,
+    overflow: "hidden",
+  },
+  paymentTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface.border,
+  },
+  paymentModalTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  bookingSummaryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.brand.light,
+    borderRadius: radii.lg,
+    padding: 10,
+    marginBottom: 10,
+  },
+  summaryService: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  summaryTotal: {
     fontSize: 13,
-    color: '#475569',
+    fontWeight: "900",
+    color: colors.brand.dark,
   },
-  splitValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
+  payInstruction: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginBottom: 12,
+    lineHeight: 15,
   },
-  splitTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 10,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  splitTotalLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  splitTotalValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-  confirmButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 14,
-    borderRadius: 10,
+  apexBankBox: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
+    padding: 10,
+    marginBottom: 12,
   },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  apexBankTitle: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  apexBankSub: {
+    fontSize: 10,
+    color: colors.text.muted,
+    marginTop: 1,
+  },
+  utrInputLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  utrInputField: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: colors.text.primary,
+    marginBottom: 14,
+  },
+  payConfirmBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  payConfirmBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "bold",
   },
 });

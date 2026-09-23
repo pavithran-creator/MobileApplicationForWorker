@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { MatchedWorker } from "../types";
-import { Star, MapPin, Award, ShieldCheck, CheckCircle } from "lucide-react-native";
+import { colors, radii, shadows } from "../lib/theme";
+import { Star, MapPin, Award, ShieldCheck, CheckCircle2 } from "lucide-react-native";
 
 interface WorkerCardProps {
   worker: MatchedWorker;
@@ -10,68 +11,98 @@ interface WorkerCardProps {
 }
 
 export default function WorkerCard({ worker, onSelect, isSelected = false }: WorkerCardProps) {
+  const workerName = worker.name || (worker as any).full_name || "Cooperative Tradesperson";
+  const rating = (worker.avg_rating || (worker as any).average_rating || 4.9).toFixed(1);
+  const ratingCount = worker.rating_count || (worker as any).total_jobs_completed || 92;
+  const dist = worker.distance_km !== undefined ? Number(worker.distance_km).toFixed(1) : "1.5";
+  const score = worker.score || (worker as any).cooperative_score || 96;
+
   return (
     <TouchableOpacity
       style={[styles.card, isSelected && styles.cardSelected]}
       onPress={() => onSelect(worker)}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
     >
+      {/* Top Profile Row */}
       <View style={styles.topRow}>
-        <View style={styles.nameCol}>
-          <View style={styles.nameBadgeRow}>
-            <Text style={styles.workerName}>{worker.name || (worker as any).full_name || 'Cooperative Worker'}</Text>
-            <View style={styles.verifiedPill}>
-              <ShieldCheck size={12} color="#059669" />
-              <Text style={styles.verifiedText}>Coop Verified</Text>
+        <View style={styles.avatarBox}>
+          {worker.avatar_url ? (
+            <Image source={{ uri: worker.avatar_url }} style={styles.avatarImg} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarLetter}>{workerName.charAt(0)}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.infoCol}>
+          <View style={styles.nameRow}>
+            <Text style={styles.workerName} numberOfLines={1}>{workerName}</Text>
+            <View style={styles.verifiedBadge}>
+              <ShieldCheck size={11} color="#047857" />
+              <Text style={styles.verifiedText}>Verified</Text>
             </View>
           </View>
-          <Text style={styles.coopText}>{worker.cooperative_name || (worker as any).primary_skill || 'Cooperative Specialist'}</Text>
+
+          <Text style={styles.coopText} numberOfLines={1}>
+            {worker.cooperative_name || "Coimbatore District Labour Cooperative"}
+          </Text>
+
+          <View style={styles.metricsRow}>
+            <View style={styles.metricChip}>
+              <Star size={11} color="#D97706" fill="#D97706" />
+              <Text style={styles.metricVal}>{rating}</Text>
+              <Text style={styles.metricCount}>({ratingCount})</Text>
+            </View>
+
+            <View style={styles.metricChip}>
+              <MapPin size={11} color="#2563EB" />
+              <Text style={styles.metricVal}>{dist} km</Text>
+            </View>
+
+            <View style={styles.metricChip}>
+              <Award size={11} color="#059669" />
+              <Text style={styles.metricVal}>{worker.experience_years || 5}y exp</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.scoreBadge}>
-          <Text style={styles.scoreNum}>{worker.score || (worker as any).cooperative_score || 95}</Text>
-          <Text style={styles.scoreLabel}>Score</Text>
+        {/* Score Badge */}
+        <View style={styles.scoreCol}>
+          <View style={styles.scorePill}>
+            <Text style={styles.scoreNum}>{score}</Text>
+            <Text style={styles.scoreLbl}>SCORE</Text>
+          </View>
         </View>
       </View>
 
-      {/* Meta Indicators: Distance, Rating, Experience */}
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <MapPin size={13} color="#2563eb" />
-          <Text style={styles.metaText}>{worker.distance_km !== undefined ? `${Number(worker.distance_km).toFixed(1)} km away` : 'Nearby'}</Text>
-        </View>
-
-        <View style={styles.metaItem}>
-          <Star size={13} color="#f59e0b" fill="#f59e0b" />
-          <Text style={styles.metaText}>{worker.avg_rating || (worker as any).average_rating || 4.8} ({worker.rating_count || (worker as any).total_jobs_completed || 85})</Text>
-        </View>
-
-        <View style={styles.metaItem}>
-          <Award size={13} color="#059669" />
-          <Text style={styles.metaText}>{worker.experience_years || 5} yrs exp</Text>
-        </View>
-      </View>
-
-      {/* Match Explainability Chips */}
+      {/* Match Explainability Reasons */}
       {worker.reasons && worker.reasons.length > 0 && (
-        <View style={styles.reasonsBox}>
-          {worker.reasons.slice(0, 2).map((r, i) => (
-            <View key={i} style={styles.reasonChip}>
-              <CheckCircle size={10} color="#047857" />
-              <Text style={styles.reasonText} numberOfLines={1}>{r}</Text>
+        <View style={styles.reasonsContainer}>
+          {worker.reasons.slice(0, 2).map((reason, idx) => (
+            <View key={idx} style={styles.reasonRow}>
+              <CheckCircle2 size={11} color="#059669" />
+              <Text style={styles.reasonText} numberOfLines={1}>{reason}</Text>
             </View>
           ))}
         </View>
       )}
 
-      {/* Select / Book CTA */}
+      {/* Card Footer: Fair Wage & Select CTA */}
       <View style={styles.footerRow}>
-        <Text style={styles.wageText}>Fair Living Wage Guaranteed</Text>
-        <View style={[styles.selectBtn, isSelected && styles.selectBtnActive]}>
-          <Text style={[styles.selectBtnText, isSelected && styles.selectBtnTextActive]}>
+        <View>
+          <Text style={styles.fairWageLabel}>Fair Living Wage Guaranteed</Text>
+          <Text style={styles.splitSub}>90% direct to worker &bull; 10% welfare</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, isSelected && styles.actionBtnSelected]}
+          onPress={() => onSelect(worker)}
+        >
+          <Text style={[styles.actionBtnText, isSelected && styles.actionBtnTextSelected]}>
             {isSelected ? "Selected ✓" : "Book Worker"}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -79,142 +110,181 @@ export default function WorkerCard({ worker, onSelect, isSelected = false }: Wor
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
     padding: 14,
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
+    borderColor: colors.surface.border,
     marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...shadows.card,
   },
   cardSelected: {
-    borderColor: "#059669",
-    backgroundColor: "#f0fdf4",
+    borderColor: colors.brand.primary,
+    backgroundColor: "#F0FDF4",
   },
   topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 8,
+    gap: 12,
   },
-  nameCol: {
+  avatarBox: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.lg,
+    overflow: "hidden",
+  },
+  avatarImg: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.brand.dark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarLetter: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  infoCol: {
     flex: 1,
   },
-  nameBadgeRow: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     flexWrap: "wrap",
   },
   workerName: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: "bold",
-    color: "#0f172a",
+    color: colors.text.primary,
   },
-  verifiedPill: {
+  verifiedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: "#ecfdf5",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    gap: 2,
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
     borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderRadius: radii.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   verifiedText: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#059669",
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: "#047857",
   },
   coopText: {
     fontSize: 11,
-    color: "#64748b",
-    marginTop: 2,
+    color: colors.text.muted,
+    marginTop: 1,
   },
-  scoreBadge: {
-    backgroundColor: "#f8fafc",
+  metricsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  metricChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  metricVal: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.text.secondary,
+  },
+  metricCount: {
+    fontSize: 9.5,
+    color: colors.text.subtle,
+  },
+  scoreCol: {
+    alignItems: "center",
+  },
+  scorePill: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    paddingHorizontal: 8,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    paddingHorizontal: 7,
     paddingVertical: 4,
     alignItems: "center",
   },
   scoreNum: {
     fontSize: 13,
-    fontWeight: "bold",
-    color: "#0f172a",
+    fontWeight: "900",
+    color: colors.brand.primary,
   },
-  scoreLabel: {
-    fontSize: 9,
-    color: "#64748b",
+  scoreLbl: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: colors.text.muted,
   },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#f1f5f9",
-    marginVertical: 6,
+  reasonsContainer: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.md,
+    padding: 8,
+    marginTop: 10,
+    gap: 3,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 11,
-    color: "#475569",
-    fontWeight: "600",
-  },
-  reasonsBox: {
-    gap: 4,
-    marginVertical: 6,
-  },
-  reasonChip: {
+  reasonRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
   reasonText: {
     fontSize: 10.5,
-    color: "#065f46",
+    color: colors.brand.emerald800,
     fontWeight: "500",
+    flex: 1,
   },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 6,
-    paddingTop: 4,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
   },
-  wageText: {
-    fontSize: 10.5,
-    color: "#059669",
+  fairWageLabel: {
+    fontSize: 11,
     fontWeight: "bold",
+    color: colors.brand.primary,
   },
-  selectBtn: {
+  splitSub: {
+    fontSize: 9.5,
+    color: colors.text.muted,
+    marginTop: 1,
+  },
+  actionBtn: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    backgroundColor: "#065f46",
-    borderRadius: 8,
+    backgroundColor: colors.brand.primary,
+    borderRadius: radii.md,
+    shadowColor: colors.brand.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  selectBtnActive: {
-    backgroundColor: "#059669",
+  actionBtnSelected: {
+    backgroundColor: colors.brand.accent,
   },
-  selectBtnText: {
+  actionBtnText: {
     fontSize: 11.5,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: "#FFFFFF",
   },
-  selectBtnTextActive: {
-    color: "#ffffff",
+  actionBtnTextSelected: {
+    color: "#FFFFFF",
   },
 });

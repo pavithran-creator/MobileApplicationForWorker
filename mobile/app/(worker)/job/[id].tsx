@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,22 +7,37 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Image,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../lib/auth';
-import { BookingRecord } from '../../../types';
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import MobileHeader from "../../../components/Header";
+import InvoiceModal from "../../../components/InvoiceModal";
+import { useAuth } from "../../../lib/auth";
+import { useLang } from "../../../lib/i18n";
+import { request } from "../../../lib/api";
+import { colors, radii, shadows } from "../../../lib/theme";
+import { BookingRecord, InvoiceRecord } from "../../../types";
+import {
+  ShieldCheck,
+  Calendar,
+  Clock,
+  MapPin,
+  FileText,
+  CheckCircle2,
+  ArrowLeft,
+  Phone,
+} from "lucide-react-native";
 
 export default function WorkerJobDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { workerProfile } = useAuth();
+  const { user } = useAuth();
+  const { t } = useLang();
 
   const [job, setJob] = useState<BookingRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoice, setInvoice] = useState<InvoiceRecord | null>(null);
 
   useEffect(() => {
     fetchJobDetails();
@@ -31,444 +46,439 @@ export default function WorkerJobDetailScreen() {
   const fetchJobDetails = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          services:service_id (name, category),
-          customers:customer_id (
-            profiles:user_id (full_name, phone)
-          )
-        `)
-        .eq('id', id)
-        .single();
+      const bookings = await request<BookingRecord[]>("/bookings");
+      const found = Array.isArray(bookings) ? bookings.find((b) => String(b.id) === String(id)) : null;
 
-      if (!error && data) {
-        setJob({
-          id: data.id,
-          customer_id: data.customer_id,
-          worker_id: data.worker_id,
-          service_id: data.service_id,
-          status: data.status,
-          scheduled_date: data.scheduled_date,
-          total_amount: data.total_amount || 399,
-          worker_wage: data.worker_wage || Math.round((data.total_amount || 399) * 0.9),
-          cooperative_surcharge: data.cooperative_surcharge || Math.round((data.total_amount || 399) * 0.1),
-          service_address: data.service_address || 'Customer Location',
-          notes: data.notes,
-          photo_url: data.photo_url,
-          created_at: data.created_at,
-          service_name: data.services?.name || 'Cooperative Service',
-          customer_name: data.customers?.profiles?.full_name || 'Meena Sundaram',
-          customer_phone: data.customers?.profiles?.phone || '9000000011',
-        });
+      if (found) {
+        setJob(found);
       } else {
-        // Mock fallback
         setJob({
-          id: (id as string) || 'job-901',
-          customer_id: 'cust-1',
-          worker_id: 'work-1',
-          service_id: 'srv-1',
-          status: 'REQUESTED',
-          scheduled_date: new Date().toISOString(),
-          total_amount: 399,
-          worker_wage: 359,
-          cooperative_surcharge: 40,
-          service_address: '42/B, Anna Salai, Royapettah (1.4 km)',
-          notes: 'Customer reported ceiling fan regulator heating up and smelling burnt.',
-          photo_url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600',
-          service_name: 'Ceiling Fan Rewiring & Servicing',
-          customer_name: 'Meena Sundaram',
-          customer_phone: '9000000011',
-          created_at: new Date().toISOString(),
+          id: Number(id) || 101,
+          service_name: "Fan & light repair",
+          worker_id: 1,
+          worker_name: user?.name || "Suresh Kumar",
+          worker_phone: user?.phone || "9010000001",
+          customer_id: 11,
+          customer_name: "Meena Sundaram",
+          date: new Date().toISOString().split("T")[0],
+          start_time: "10:00",
+          duration_min: 45,
+          status: "CONFIRMED",
+          is_emergency: false,
+          total_amount: 250,
+          service_amount: 225,
+          coop_charge: 25,
+          address: "142, Cross Cut Road, Gandhipuram, Coimbatore",
+          description: "Customer reported ceiling fan regulator heating up and humming loudly.",
         });
       }
-    } catch (e) {
-      console.warn('Job details error:', e);
+    } catch {
+      // Fallback
     } finally {
       setLoading(false);
     }
   };
 
-  const updateJobStatus = async (newStatus: 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') => {
+  const handleUpdateStatus = async (nextStatus: string) => {
+    if (!job) return;
+    setUpdating(true);
     try {
-      setUpdating(true);
-      if (job) {
-        await supabase
-          .from('bookings')
-          .update({ status: newStatus })
-          .eq('id', job.id);
-
-        setJob({ ...job, status: newStatus });
-        Alert.alert('Status Updated', `Job marked as ${newStatus}.`);
-      }
-    } catch (e: any) {
-      if (job) setJob({ ...job, status: newStatus });
-      Alert.alert('Status Updated (Local)', `Job transitioned to ${newStatus}.`);
+      await request<any>(`/bookings/${job.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      fetchJobDetails();
+      Alert.alert("Status Updated", `Job is now marked as ${nextStatus}.`);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to update status");
     } finally {
       setUpdating(false);
     }
   };
 
+  const handleOpenInvoice = async () => {
+    if (!job) return;
+    try {
+      const inv = await request<InvoiceRecord>(`/invoices/${job.id}`);
+      setInvoice(inv);
+      setShowInvoice(true);
+    } catch {
+      const total = Number(job.total_amount) || 250;
+      const workerWage = Number(job.service_amount) || Math.round(total * 0.9);
+      const coopFee = Number(job.coop_charge) || Math.round(total - workerWage);
+      setInvoice({
+        id: job.id,
+        invoice_no: `INV-TN-COOP-2026-${String(job.id).padStart(4, "0")}`,
+        booking_id: job.id,
+        date: job.date,
+        scheduled_date: job.date,
+        start_time: job.start_time,
+        total,
+        worker_wage: workerWage,
+        coop_charge: coopFee,
+        payment_status: job.status === "COMPLETED" ? "PAID" : "UNPAID",
+        customer_name: job.customer_name,
+        customer_address: job.address,
+        worker_name: job.worker_name,
+        worker_phone: job.worker_phone,
+        service_name: job.service_name,
+        cooperative_name: "Gandhipuram Labour Cooperative Society",
+        coop_registration_no: "TNCF/CBE/1983/9412",
+        gstin: "33AAAAA0000A1Z5",
+        bank_name: "Tamil Nadu State Apex Cooperative Bank",
+        bank_account_no: "921020045678912",
+        bank_ifsc: "TNSC0001001",
+        items: [
+          { label: `Direct Worker Fair Wage (90% - ${job.worker_name})`, amount: workerWage },
+          { label: "Cooperative Welfare & Admin Surcharge (10%)", amount: coopFee },
+        ],
+      });
+      setShowInvoice(true);
+    }
+  };
+
   if (loading || !job) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16A34A" />
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color={colors.brand.primary} />
+        <Text style={styles.loadingText}>Loading assigned task details...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Top Header Card */}
-      <View style={styles.card}>
-        <View style={styles.badgeRow}>
-          <View style={[styles.statusBadge, { backgroundColor: job.status === 'COMPLETED' ? '#DCFCE7' : '#EFF6FF' }]}>
-            <Text style={[styles.statusBadgeText, { color: job.status === 'COMPLETED' ? '#16A34A' : '#2563EB' }]}>
-              {job.status}
-            </Text>
+    <View style={styles.screen}>
+      <MobileHeader title="Job Inspection" showEmergency={false} />
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Back Link */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ArrowLeft size={16} color={colors.brand.primary} />
+          <Text style={styles.backBtnText}>{t("worker.back_queue", "Back to Assigned Queue")}</Text>
+        </TouchableOpacity>
+
+        {/* Job Card */}
+        <View style={styles.card}>
+          <View style={styles.topRow}>
+            <View>
+              <Text style={styles.jobId}>Cooperative Task #{job.id}</Text>
+              <Text style={styles.srvTitle}>{job.service_name}</Text>
+            </View>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusText}>{t("status." + job.status.toLowerCase(), job.status)}</Text>
+            </View>
           </View>
-          <Text style={styles.jobRef}>#{job.id.slice(0, 8)}</Text>
-        </View>
 
-        <Text style={styles.jobTitle}>{job.service_name}</Text>
+          <View style={styles.divider} />
 
-        <View style={styles.wageHighlightCard}>
-          <View>
-            <Text style={styles.wageLabel}>Your 90% Direct Cooperative Wage</Text>
-            <Text style={styles.wageAmount}>₹{job.worker_wage}</Text>
+          {/* Time & Slot */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Calendar size={13} color={colors.brand.primary} />
+              <Text style={styles.metaVal}>{job.date}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Clock size={13} color={colors.brand.primary} />
+              <Text style={styles.metaVal}>{job.start_time || "10:00"} (45m SLA)</Text>
+            </View>
           </View>
-          <View style={styles.splitNoteBox}>
-            <Text style={styles.splitNote}>Total Bill: ₹{job.total_amount}</Text>
-            <Text style={styles.splitNote}>Welfare Fund: ₹{job.cooperative_surcharge}</Text>
+
+          {/* Customer & Location */}
+          <View style={styles.customerBox}>
+            <Text style={styles.boxLabel}>DISPATCHED CUSTOMER</Text>
+            <Text style={styles.custName}>{job.customer_name}</Text>
+            <View style={styles.phoneRow}>
+              <Phone size={12} color={colors.brand.primary} />
+              <Text style={styles.phoneVal}>9000000011</Text>
+            </View>
+            <View style={styles.addressRow}>
+              <MapPin size={12} color={colors.text.secondary} />
+              <Text style={styles.addressVal} numberOfLines={2}>{job.address}</Text>
+            </View>
           </View>
-        </View>
-      </View>
 
-      {/* Customer Location & Contact */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Client & Dispatch Location</Text>
+          {/* Description */}
+          {job.description && (
+            <View style={styles.descBox}>
+              <Text style={styles.boxLabel}>REPORTED PROBLEM NOTES</Text>
+              <Text style={styles.descText}>{job.description}</Text>
+            </View>
+          )}
 
-        <View style={styles.rowItem}>
-          <Ionicons name="person" size={16} color="#16A34A" />
-          <Text style={styles.customerName}>{job.customer_name}</Text>
-        </View>
-
-        <View style={styles.rowItem}>
-          <Ionicons name="location" size={16} color="#DC2626" />
-          <Text style={styles.locationText}>{job.service_address}</Text>
-        </View>
-
-        {job.customer_phone && (
-          <TouchableOpacity style={styles.callButton}>
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-            <Text style={styles.callButtonText}>Call Customer ({job.customer_phone})</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Multimodal Diagnostic Proof: Live Image & Notes */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Customer Problem Capture</Text>
-
-        {job.photo_url ? (
-          <View style={styles.photoBox}>
-            <Text style={styles.photoLabel}>Customer's Live Problem Snapshot:</Text>
-            <Image source={{ uri: job.photo_url }} style={styles.photoPreview} />
+          {/* 90% Take-Home Wage Breakdown */}
+          <View style={styles.wageBox}>
+            <Text style={styles.boxLabel}>{t("dashboard.invoice_modal_title", "STATUTORY WAGE ALLOCATION")}</Text>
+            <View style={styles.wageRow}>
+              <Text style={styles.wageLabel}>{t("dashboard.invoice_worker_wage", "Direct Tradesperson Take-Home (90%):")}</Text>
+              <Text style={styles.takeHomeVal}>
+                ₹{(Number(job.service_amount) || Number(job.total_amount) * 0.9).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.wageRow}>
+              <Text style={styles.wageLabel}>{t("dashboard.invoice_coop_fee", "Cooperative Social Security Fund (10%):")}</Text>
+              <Text style={styles.wageSub}>
+                ₹{(Number(job.coop_charge) || Number(job.total_amount) * 0.1).toFixed(2)}
+              </Text>
+            </View>
           </View>
-        ) : null}
 
-        {job.notes ? (
-          <View style={styles.notesContainer}>
-            <Text style={styles.notesLabel}>Diagnosis / Transcript Notes:</Text>
-            <Text style={styles.notesText}>{job.notes}</Text>
-          </View>
-        ) : (
-          <Text style={styles.emptyNotesText}>No additional problem notes provided.</Text>
-        )}
-      </View>
+          {/* Action Buttons */}
+          <View style={styles.actionsContainer}>
+            {job.status === "CONFIRMED" && (
+              <TouchableOpacity
+                style={styles.startBtn}
+                onPress={() => handleUpdateStatus("IN_PROGRESS")}
+                disabled={updating}
+              >
+                <Text style={styles.startBtnText}>{t("worker.start_job", "Start Trade Task")}</Text>
+              </TouchableOpacity>
+            )}
 
-      {/* Action Buttons for Worker Workflow */}
-      <View style={styles.actionSection}>
-        {job.status === 'REQUESTED' && (
-          <View style={styles.dualActionRow}>
+            {job.status === "IN_PROGRESS" && (
+              <TouchableOpacity
+                style={styles.completeBtn}
+                onPress={() => handleUpdateStatus("COMPLETED")}
+                disabled={updating}
+              >
+                <Text style={styles.completeBtnText}>{t("worker.complete_job", "Mark Completed ✓")}</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
-              style={[styles.actionBtn, styles.acceptBtn]}
-              onPress={() => updateJobStatus('ACCEPTED')}
-              disabled={updating}
+              style={styles.invoiceBtn}
+              onPress={handleOpenInvoice}
             >
-              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.actionBtnText}>Accept Job Order</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.rejectBtn]}
-              onPress={() => updateJobStatus('CANCELLED')}
-              disabled={updating}
-            >
-              <Ionicons name="close-circle" size={18} color="#DC2626" />
-              <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Decline</Text>
+              <FileText size={14} color={colors.brand.primary} />
+              <Text style={styles.invoiceBtnText}>{t("dashboard.view_invoice", "View Audited Tax Invoice")}</Text>
             </TouchableOpacity>
           </View>
-        )}
+        </View>
+      </ScrollView>
 
-        {job.status === 'ACCEPTED' && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.arrivedBtn]}
-            onPress={() => updateJobStatus('ARRIVED')}
-            disabled={updating}
-          >
-            <Ionicons name="navigate" size={18} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Mark Arrived at Location</Text>
-          </TouchableOpacity>
-        )}
-
-        {job.status === 'ARRIVED' && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.startBtn]}
-            onPress={() => updateJobStatus('IN_PROGRESS')}
-            disabled={updating}
-          >
-            <Ionicons name="play" size={18} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Start Service Work</Text>
-          </TouchableOpacity>
-        )}
-
-        {job.status === 'IN_PROGRESS' && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.completeBtn]}
-            onPress={() => updateJobStatus('COMPLETED')}
-            disabled={updating}
-          >
-            <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Complete Job & Request Payment (₹{job.worker_wage})</Text>
-          </TouchableOpacity>
-        )}
-
-        {job.status === 'COMPLETED' && (
-          <View style={styles.completedNotice}>
-            <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-            <Text style={styles.completedTitle}>Job Completed Successfully</Text>
-            <Text style={styles.completedSub}>₹{job.worker_wage} credited directly to your cooperative ledger.</Text>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      {/* Invoice Modal */}
+      <InvoiceModal
+        visible={showInvoice}
+        invoice={invoice}
+        onClose={() => setShowInvoice(false)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface.pageBg,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 40,
-    gap: 14,
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
+  loadingBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface.pageBg,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  jobRef: {
+  loadingText: {
     fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
+    color: colors.text.muted,
+    marginTop: 8,
   },
-  jobTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     marginBottom: 12,
   },
-  wageHighlightCard: {
-    backgroundColor: '#F0FDF4',
+  backBtnText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
-    borderRadius: 10,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderColor: colors.surface.border,
+    ...shadows.card,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  jobId: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  srvTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.text.primary,
+    marginTop: 2,
+  },
+  statusPill: {
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: radii.full,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#047857",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 10,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaVal: {
+    fontSize: 11.5,
+    color: colors.text.secondary,
+  },
+  customerBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.lg,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    marginBottom: 10,
+  },
+  boxLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  custName: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  phoneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  phoneVal: {
+    fontSize: 11,
+    color: colors.brand.primary,
+    fontWeight: "600",
+  },
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  addressVal: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    flex: 1,
+  },
+  descBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.lg,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    marginBottom: 10,
+  },
+  descText: {
+    fontSize: 11.5,
+    color: colors.text.secondary,
+    lineHeight: 16,
+  },
+  wageBox: {
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    backgroundColor: "#F0FDF4",
+    borderRadius: radii.lg,
+    padding: 10,
+    marginBottom: 14,
+    gap: 3,
+  },
+  wageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   wageLabel: {
     fontSize: 11,
-    color: '#166534',
-    fontWeight: '600',
+    color: colors.brand.dark,
+    fontWeight: "600",
   },
-  wageAmount: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#15803D',
-    marginTop: 2,
-  },
-  splitNoteBox: {
-    alignItems: 'flex-end',
-  },
-  splitNote: {
-    fontSize: 11,
-    color: '#166534',
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
-  },
-  rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  customerName: {
+  takeHomeVal: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "900",
+    color: colors.brand.dark,
   },
-  locationText: {
-    fontSize: 13,
-    color: '#475569',
-    flex: 1,
-  },
-  callButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#16A34A',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-    marginTop: 6,
-  },
-  callButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  photoBox: {
-    marginBottom: 12,
-  },
-  photoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 6,
-  },
-  photoPreview: {
-    width: '100%',
-    height: 180,
-    borderRadius: 8,
-    backgroundColor: '#0F172A',
-  },
-  notesContainer: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 10,
-  },
-  notesLabel: {
+  wageSub: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    marginBottom: 4,
+    color: colors.brand.emerald800,
   },
-  notesText: {
-    fontSize: 13,
-    color: '#1E293B',
-    lineHeight: 18,
-  },
-  emptyNotesText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    fontStyle: 'italic',
-  },
-  actionSection: {
-    marginTop: 4,
-  },
-  dualActionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 10,
+  actionsContainer: {
     gap: 8,
-  },
-  acceptBtn: {
-    flex: 2,
-    backgroundColor: '#16A34A',
-  },
-  rejectBtn: {
-    flex: 1,
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  arrivedBtn: {
-    backgroundColor: '#2563EB',
   },
   startBtn: {
-    backgroundColor: '#D97706',
+    backgroundColor: "#1D4ED8",
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  startBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "bold",
   },
   completeBtn: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
   },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+  completeBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "bold",
   },
-  completedNotice: {
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+  invoiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingVertical: 10,
+    borderRadius: radii.lg,
   },
-  completedTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#166534',
-  },
-  completedSub: {
-    fontSize: 13,
-    color: '#166534',
-    textAlign: 'center',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  invoiceBtnText: {
+    color: colors.brand.primary,
+    fontSize: 11.5,
+    fontWeight: "bold",
   },
 });

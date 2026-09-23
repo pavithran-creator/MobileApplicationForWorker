@@ -28,6 +28,18 @@ const I18nContext = createContext<I18nContextType>({
   t: (key: string, fallback?: string) => fallback || key,
 });
 
+export interface LanguageOption {
+  code: string;
+  label: string;
+  native: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: "en", label: "English (EN)", native: "Default Interface" },
+  { code: "ta", label: "தமிழ் (Tamil)", native: "தமிழ்நாடு அரசு பதிவு" },
+  { code: "hi", label: "हिन्दी (Hindi)", native: "सहकारी मंच" },
+];
+
 export function MobileLangProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<string>("en");
 
@@ -40,14 +52,17 @@ export function MobileLangProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const setLang = (newLang: string) => {
-    setLangState(newLang);
-    AsyncStorage.setItem("ondemand_mobile_lang", newLang);
+    if (newLang === "en" || newLang === "ta" || newLang === "hi") {
+      setLangState(newLang);
+      AsyncStorage.setItem("ondemand_mobile_lang", newLang);
+    }
   };
 
   const t = (key: string, fallback?: string, params?: Record<string, string | number>): string => {
-    const dict = dictionaries[lang] || dictionaries.en;
-    let res = dict[key] ?? dictionaries.en[key] ?? fallback ?? key;
-    if (params) {
+    const currentDict = dictionaries[lang] || dictionaries.en;
+    let res = currentDict[key] ?? dictionaries.en[key] ?? fallback ?? key;
+
+    if (params && typeof res === "string") {
       Object.entries(params).forEach(([k, v]) => {
         res = res.replace(new RegExp(`{${k}}`, "g"), String(v));
       });
@@ -72,3 +87,4 @@ export function MobileLangProvider({ children }: { children: React.ReactNode }) 
 
 export const useLang = () => useContext(I18nContext);
 export const useI18n = () => useContext(I18nContext);
+

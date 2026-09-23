@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Share, Platform } from "react-native";
 import { InvoiceRecord } from "../types";
-import { CheckCircle2, ShieldCheck, X, FileText } from "lucide-react-native";
+import { colors, radii, shadows } from "../lib/theme";
+import { CheckCircle2, ShieldCheck, X, Share2, Building2 } from "lucide-react-native";
 
 interface InvoiceModalProps {
   visible: boolean;
@@ -12,89 +13,167 @@ interface InvoiceModalProps {
 export default function InvoiceModal({ visible, invoice, onClose }: InvoiceModalProps) {
   if (!invoice) return null;
 
+  const totalAmount = parseFloat(String(invoice.total || 0)) || 0;
+  const workerWage =
+    invoice.worker_wage !== undefined && invoice.worker_wage !== null
+      ? parseFloat(String(invoice.worker_wage)) || 0
+      : Math.round(totalAmount * 0.9 * 100) / 100;
+  const coopFee =
+    invoice.coop_charge !== undefined && invoice.coop_charge !== null
+      ? parseFloat(String(invoice.coop_charge)) || 0
+      : Math.round((totalAmount - workerWage) * 100) / 100;
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        title: `Cooperative Tax Invoice - ${invoice.invoice_no}`,
+        message: `TAMIL NADU LABOUR COOPERATIVE FEDERATION\nStatutory Tax Invoice: ${invoice.invoice_no}\nBooking #${invoice.booking_id}\nService: ${invoice.service_name}\nTradesperson: ${invoice.worker_name}\nCustomer: ${invoice.customer_name}\nTotal: ₹${totalAmount}\nWorker Fair Wage (90%): ₹${workerWage}\nCoop Welfare (10%): ₹${coopFee}\nPayment Status: ${invoice.payment_status}\nRef: ${invoice.transaction_ref || "UTR-TNSC-VERIFIED"}`,
+      });
+    } catch {}
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.headerTitleRow}>
-              <FileText size={18} color="#065f46" />
-              <Text style={styles.modalTitle}>Statutory Cooperative Tax Invoice</Text>
+          {/* Header Action Bar */}
+          <View style={styles.topActions}>
+            <View style={styles.taxPill}>
+              <Text style={styles.taxPillText}>STATUTORY TAX INVOICE</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={18} color="#64748b" />
-            </TouchableOpacity>
+            <View style={styles.actionIcons}>
+              <TouchableOpacity onPress={handleShare} style={styles.iconBtn}>
+                <Share2 size={16} color={colors.text.secondary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
+                <X size={18} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
-            {/* Cooperative Federation Authority Header */}
-            <View style={styles.federationBox}>
-              <Text style={styles.federationName}>Tamil Nadu Labour Cooperative Federation</Text>
-              <Text style={styles.coopDetails}>Registration: TNCF/CBE/1983/9412 • GSTIN: 33AAAAA0000A1Z5</Text>
-              <Text style={styles.coopBank}>Bank: Tamil Nadu State Apex Cooperative Bank (TNSC0001001)</Text>
+            {/* Federation Header Banner */}
+            <View style={styles.federationBanner}>
+              <View style={styles.fedLogoBadge}>
+                <Text style={styles.fedLogoText}>⚙</Text>
+              </View>
+              <View style={styles.fedInfo}>
+                <Text style={styles.fedTitle}>TAMIL NADU LABOUR COOPERATIVE FEDERATION</Text>
+                <Text style={styles.societyName}>
+                  {invoice.cooperative_name || "Coimbatore District Labour Cooperative Society"}
+                </Text>
+                <Text style={styles.regText}>
+                  Reg. No: {invoice.coop_registration_no || "TNCF/CBE/1983/9412"} &bull; GSTIN: {invoice.gstin || "33AAAAA0000A1Z5"}
+                </Text>
+              </View>
             </View>
 
-            {/* Invoice Meta Grid */}
-            <View style={styles.metaGrid}>
-              <View style={styles.metaCell}>
-                <Text style={styles.metaLabel}>Invoice No</Text>
-                <Text style={styles.metaVal}>{invoice.invoice_no}</Text>
+            {/* Invoice Meta Pill Bar */}
+            <View style={styles.invoiceMetaBar}>
+              <View>
+                <Text style={styles.metaLabel}>INVOICE NUMBER</Text>
+                <Text style={styles.metaValMono}>{invoice.invoice_no}</Text>
               </View>
-              <View style={styles.metaCell}>
-                <Text style={styles.metaLabel}>Date</Text>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.metaLabel}>DATE OF SERVICE</Text>
                 <Text style={styles.metaVal}>{invoice.date || invoice.scheduled_date}</Text>
               </View>
-              <View style={styles.metaCell}>
-                <Text style={styles.metaLabel}>Citizen / Customer</Text>
-                <Text style={styles.metaVal}>{invoice.customer_name || "Cooperative Member"}</Text>
+            </View>
+
+            {/* Key Parties: Customer & Tradesperson */}
+            <View style={styles.partiesBox}>
+              <View style={styles.partyCol}>
+                <Text style={styles.partyRole}>BILLED TO (CITIZEN / CUSTOMER)</Text>
+                <Text style={styles.partyName}>{invoice.customer_name || "Cooperative Citizen"}</Text>
+                <Text style={styles.partyDetail}>Ph: {invoice.customer_phone || "9000000011"}</Text>
+                <Text style={styles.partyDetail}>{invoice.customer_address || "Gandhipuram, Coimbatore"}</Text>
               </View>
-              <View style={styles.metaCell}>
-                <Text style={styles.metaLabel}>Assigned Tradesperson</Text>
-                <Text style={styles.metaVal}>{invoice.worker_name || "Verified Worker"}</Text>
+
+              <View style={styles.partyDivider} />
+
+              <View style={styles.partyCol}>
+                <Text style={styles.partyRole}>ASSIGNED CERTIFIED TRADESPERSON</Text>
+                <Text style={styles.partyName}>{invoice.worker_name || "Cooperative Worker"}</Text>
+                <Text style={styles.serviceName}>{invoice.service_name}</Text>
+                <Text style={styles.partyDetail}>Booking #{invoice.booking_id} &bull; {invoice.start_time || "10:00"}</Text>
               </View>
             </View>
 
-            {/* Transparent 90/10 Fair Wage Breakdown */}
-            <Text style={styles.sectionHeading}>Itemized Statutory Fair Wage Breakdown</Text>
-            <View style={styles.breakdownTable}>
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Direct Worker Fair Wage (90%)</Text>
-                <Text style={styles.tableValue}>₹{invoice.worker_wage || Math.round(invoice.total * 0.9)}</Text>
+            {/* Transparent 90/10 Fair Wage Breakdown Table */}
+            <Text style={styles.sectionTitle}>Itemized Statutory Fee Breakdown</Text>
+            <View style={styles.tableBox}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.thText, { flex: 2 }]}>Description &amp; Fund Allocation</Text>
+                <Text style={[styles.thText, { flex: 0.8, textAlign: "center" }]}>Share</Text>
+                <Text style={[styles.thText, { flex: 1, textAlign: "right" }]}>Amount</Text>
               </View>
+
+              {/* 90% Worker Fair Wage */}
               <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Cooperative Social Security & Ops (10%)</Text>
-                <Text style={styles.tableValue}>₹{invoice.coop_charge || Math.round(invoice.total * 0.1)}</Text>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.itemTitle}>Direct Worker Fair Wage</Text>
+                  <Text style={styles.itemSub}>Direct trade compensation disbursed to tradesperson</Text>
+                </View>
+                <Text style={[styles.shareText, { flex: 0.8, textAlign: "center" }]}>90%</Text>
+                <Text style={[styles.amountText, { flex: 1, textAlign: "right" }]}>₹{workerWage.toFixed(2)}</Text>
               </View>
+
+              {/* 10% Cooperative Surcharge */}
+              <View style={styles.tableRow}>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.itemTitle}>Cooperative Welfare &amp; Admin</Text>
+                  <Text style={styles.itemSub}>ESI health cover, pension fund &amp; operations</Text>
+                </View>
+                <Text style={[styles.shareTextAmber, { flex: 0.8, textAlign: "center" }]}>10%</Text>
+                <Text style={[styles.amountText, { flex: 1, textAlign: "right" }]}>₹{coopFee.toFixed(2)}</Text>
+              </View>
+
+              {/* Grand Total */}
               <View style={[styles.tableRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Payable Amount</Text>
-                <Text style={styles.totalValue}>₹{invoice.total}</Text>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.totalLabel}>TOTAL PAYABLE</Text>
+                  <Text style={styles.totalSub}>Inclusive of all statutory welfare allocations</Text>
+                </View>
+                <Text style={[styles.totalAmount, { flex: 1.8, textAlign: "right" }]}>₹{totalAmount.toFixed(2)}</Text>
               </View>
             </View>
 
-            {/* Payment & Audit Reference */}
-            <View style={styles.paymentBox}>
-              <View style={styles.paymentStatusRow}>
-                <CheckCircle2 size={16} color="#059669" />
-                <Text style={styles.paymentStatusText}>Statutory Payment Verified</Text>
+            {/* Bank & Settlement Details */}
+            <View style={styles.bankBox}>
+              <View style={styles.bankHeader}>
+                <Building2 size={14} color={colors.brand.primary} />
+                <Text style={styles.bankHeading}>Statutory Bank Settlement Account</Text>
               </View>
-              <Text style={styles.utrText}>
-                Ref: {invoice.transaction_ref || `UTR-TNSC-${invoice.booking_id}-VERIFIED`}
+              <Text style={styles.bankDetail}>
+                Bank: {invoice.bank_name || "Tamil Nadu State Apex Cooperative Bank"}
               </Text>
+              <Text style={styles.bankDetail}>
+                A/C: {invoice.bank_account_no || "921020045678912"} &bull; IFSC: {invoice.bank_ifsc || "TNSC0001001"}
+              </Text>
+              <View style={styles.utrRow}>
+                <CheckCircle2 size={13} color="#16A34A" />
+                <Text style={styles.utrText}>
+                  Ref: {invoice.transaction_ref || `UTR-TNSC-${invoice.booking_id}-SETTLED`} ({invoice.payment_status})
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.guaranteeBox}>
-              <ShieldCheck size={14} color="#065f46" />
-              <Text style={styles.guaranteeText}>
-                Backed by 30-Day Tamil Nadu Labour Cooperative Service Assurance.
-              </Text>
+            {/* 30-Day Guarantee Seal */}
+            <View style={styles.guaranteeBanner}>
+              <ShieldCheck size={16} color={colors.brand.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.guaranteeTitle}>30-Day Cooperative Service Assurance</Text>
+                <Text style={styles.guaranteeDesc}>
+                  Audited by Tamil Nadu Registrar of Cooperative Societies. Free rework guaranteed.
+                </Text>
+              </View>
             </View>
           </ScrollView>
 
           {/* Footer Action */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.doneBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={styles.doneBtnText}>Close Invoice</Text>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={styles.closeBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -106,187 +185,321 @@ export default function InvoiceModal({ visible, invoice, onClose }: InvoiceModal
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    justifyContent: "center",
+    padding: 14,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   modalCard: {
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "85%",
-    paddingBottom: 24,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    maxHeight: "92%",
+    ...shadows.elevated,
+    overflow: "hidden",
   },
-  modalHeader: {
+  topActions: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: colors.surface.border,
   },
-  headerTitleRow: {
+  taxPill: {
+    backgroundColor: colors.brand.light,
+    borderColor: colors.brand.accent,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  taxPillText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    color: colors.brand.primary,
+    letterSpacing: 0.5,
+  },
+  actionIcons: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  modalTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#0f172a",
-  },
-  closeBtn: {
-    padding: 4,
+  iconBtn: {
+    padding: 6,
+    backgroundColor: "#F1F5F9",
+    borderRadius: radii.md,
   },
   scrollBody: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    padding: 16,
   },
-  federationBox: {
-    backgroundColor: "#f0fdf4",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    marginBottom: 14,
+  federationBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.brand.primary,
+    paddingBottom: 12,
   },
-  federationName: {
-    fontSize: 12,
+  fedLogoBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.md,
+    backgroundColor: colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fedLogoText: {
+    fontSize: 20,
+    color: "#FDE68A",
     fontWeight: "bold",
-    color: "#065f46",
   },
-  coopDetails: {
-    fontSize: 10,
-    color: "#047857",
-    marginTop: 2,
+  fedInfo: {
+    flex: 1,
   },
-  coopBank: {
-    fontSize: 10,
-    color: "#047857",
+  fedTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: colors.brand.dark,
+    letterSpacing: -0.3,
+  },
+  societyName: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.brand.primary,
     marginTop: 1,
   },
-  metaGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    padding: 8,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+  regText: {
+    fontSize: 9.5,
+    color: colors.text.muted,
+    marginTop: 1,
   },
-  metaCell: {
-    width: "50%",
-    padding: 6,
+  invoiceMetaBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.md,
+    padding: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
   },
   metaLabel: {
-    fontSize: 10,
-    color: "#64748b",
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+  },
+  metaValMono: {
+    fontSize: 12,
+    fontWeight: "bold",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    color: colors.text.primary,
+    marginTop: 2,
   },
   metaVal: {
-    fontSize: 12,
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.text.primary,
+    marginTop: 2,
+  },
+  partiesBox: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
+    padding: 12,
+    marginTop: 12,
+  },
+  partyCol: {
+    flex: 1,
+  },
+  partyDivider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 8,
+  },
+  partyRole: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  partyName: {
+    fontSize: 13,
     fontWeight: "bold",
-    color: "#0f172a",
+    color: colors.text.primary,
+  },
+  partyDetail: {
+    fontSize: 11,
+    color: colors.text.secondary,
     marginTop: 1,
   },
-  sectionHeading: {
+  serviceName: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.brand.primary,
+    marginTop: 1,
+  },
+  sectionTitle: {
     fontSize: 12,
     fontWeight: "bold",
-    color: "#334155",
-    marginBottom: 8,
+    color: colors.text.primary,
+    marginTop: 14,
+    marginBottom: 6,
   },
-  breakdownTable: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
+  tableBox: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
     overflow: "hidden",
-    marginBottom: 14,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface.border,
+  },
+  thText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.text.secondary,
   },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#F1F5F9",
   },
-  tableLabel: {
-    fontSize: 11,
-    color: "#475569",
+  itemTitle: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: colors.text.primary,
   },
-  tableValue: {
+  itemSub: {
+    fontSize: 9.5,
+    color: colors.text.muted,
+    marginTop: 1,
+  },
+  shareText: {
     fontSize: 11,
+    fontWeight: "700",
+    color: colors.brand.primary,
+  },
+  shareTextAmber: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.status.warning,
+  },
+  amountText: {
+    fontSize: 12,
     fontWeight: "bold",
-    color: "#0f172a",
+    color: colors.text.primary,
   },
   totalRow: {
-    backgroundColor: "#ecfdf5",
+    backgroundColor: colors.brand.light,
     borderBottomWidth: 0,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.brand.primary,
+    paddingVertical: 10,
   },
   totalLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#065f46",
+    fontSize: 11,
+    fontWeight: "900",
+    color: colors.brand.dark,
+    letterSpacing: 0.5,
   },
-  totalValue: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#065f46",
+  totalSub: {
+    fontSize: 9,
+    color: colors.brand.primary,
   },
-  paymentBox: {
-    backgroundColor: "#f8fafc",
-    padding: 12,
-    borderRadius: 12,
+  totalAmount: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.brand.dark,
+  },
+  bankBox: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginBottom: 10,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    padding: 10,
+    marginTop: 12,
   },
-  paymentStatusRow: {
+  bankHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
+    marginBottom: 4,
   },
-  paymentStatusText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#059669",
+  bankHeading: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: colors.brand.primary,
+  },
+  bankDetail: {
+    fontSize: 10,
+    color: colors.text.secondary,
+    marginTop: 1,
+  },
+  utrRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
   },
   utrText: {
     fontSize: 10,
-    color: "#64748b",
-    marginTop: 3,
-    fontFamily: "monospace",
+    fontWeight: "700",
+    color: "#16A34A",
   },
-  guaranteeBox: {
+  guaranteeBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    backgroundColor: colors.brand.light,
+    borderWidth: 1,
+    borderColor: colors.brand.accent,
+    borderRadius: radii.md,
     padding: 10,
-    backgroundColor: "#ecfdf5",
-    borderRadius: 10,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 10,
   },
-  guaranteeText: {
-    fontSize: 10,
-    color: "#065f46",
-    fontWeight: "500",
-    flex: 1,
+  guaranteeTitle: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  guaranteeDesc: {
+    fontSize: 9.5,
+    color: colors.brand.emerald800,
+    marginTop: 1,
   },
   modalFooter: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.surface.border,
+    backgroundColor: "#FFFFFF",
   },
-  doneBtn: {
-    backgroundColor: "#065f46",
-    borderRadius: 12,
-    paddingVertical: 12,
+  closeBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 11,
+    borderRadius: radii.lg,
     alignItems: "center",
   },
-  doneBtnText: {
+  closeBtnText: {
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "bold",
-    color: "#ffffff",
   },
 });

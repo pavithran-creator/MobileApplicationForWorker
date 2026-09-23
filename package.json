@@ -9,6 +9,9 @@
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "frontend": "npm --prefix frontend run dev",
+    "mobile": "npm --prefix mobile run web",
+    "mobile:start": "npm --prefix mobile run start",
+    "build:apk": "npm --prefix mobile run build:apk",
     "build": "npm --prefix frontend run build",
     "postinstall": "npm --prefix frontend install",
     "install:frontend": "npm --prefix frontend install"

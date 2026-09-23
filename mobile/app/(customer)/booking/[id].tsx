@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,645 +8,613 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Image,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../lib/auth';
-import { useI18n } from '../../../lib/i18n';
-import InvoiceModal from '../../../components/InvoiceModal';
-import { BookingRecord, InvoiceRecord } from '../../../types';
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import MobileHeader from "../../../components/Header";
+import InvoiceModal from "../../../components/InvoiceModal";
+import { useAuth } from "../../../lib/auth";
+import { useLang } from "../../../lib/i18n";
+import { request } from "../../../lib/api";
+import { colors, radii, shadows } from "../../../lib/theme";
+import { BookingRecord, InvoiceRecord } from "../../../types";
+import {
+  ShieldCheck,
+  Calendar,
+  Clock,
+  MapPin,
+  Star,
+  FileText,
+  CreditCard,
+  Building2,
+  ArrowLeft,
+  CheckCircle2,
+} from "lucide-react-native";
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useLang();
 
   const [booking, setBooking] = useState<BookingRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [invoice, setInvoice] = useState<InvoiceRecord | null>(null);
 
-  // Payment states
-  const [utrNumber, setUtrNumber] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'PENDING' | 'PAID'>('PENDING');
+  // UTR payment
+  const [utrNumber, setUtrNumber] = useState("");
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
-  // Rating states
+  // Rating
   const [rating, setRating] = useState(5);
-  const [review, setReview] = useState('');
+  const [review, setReview] = useState("");
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
 
   useEffect(() => {
-    fetchBookingDetail();
+    fetchBooking();
   }, [id]);
 
-  const fetchBookingDetail = async () => {
+  const fetchBooking = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          services:service_id (name, category),
-          workers:worker_id (
-            id,
-            profiles:user_id (full_name, phone)
-          )
-        `)
-        .eq('id', id)
-        .single();
+      const bookings = await request<BookingRecord[]>("/bookings");
+      const found = Array.isArray(bookings) ? bookings.find((b) => String(b.id) === String(id)) : null;
 
-      if (!error && data) {
-        setBooking({
-          id: data.id,
-          customer_id: data.customer_id,
-          worker_id: data.worker_id,
-          service_id: data.service_id,
-          status: data.status,
-          scheduled_date: data.scheduled_date,
-          total_amount: data.total_amount || 399,
-          worker_wage: data.worker_wage || Math.round((data.total_amount || 399) * 0.9),
-          cooperative_surcharge: data.cooperative_surcharge || Math.round((data.total_amount || 399) * 0.1),
-          service_address: data.service_address || 'Customer Location',
-          notes: data.notes,
-          photo_url: data.photo_url,
-          created_at: data.created_at,
-          service_name: data.services?.name || 'Cooperative Service',
-          worker_name: data.workers?.profiles?.full_name || 'Suresh Kumar (Verified Electrician)',
-          worker_phone: data.workers?.profiles?.phone || '9010000001',
-        });
+      if (found) {
+        setBooking(found);
+        setUtrNumber(`UTR-TNSC-${found.id}-OK`);
       } else {
-        // Mock fallback for smooth demo testing
+        // Mock fallback
         setBooking({
-          id: (id as string) || 'bk-demo-1',
-          customer_id: user?.id || 'cust-1',
-          worker_id: 'work-1',
-          service_id: 'srv-1',
-          status: 'IN_PROGRESS',
-          scheduled_date: new Date().toISOString(),
-          total_amount: 399,
-          worker_wage: 359,
-          cooperative_surcharge: 40,
-          service_address: '14, Anna Nagar 2nd St, Ward 12',
-          service_name: 'Electrical Circuit & Switch Repair',
-          worker_name: 'Suresh Kumar',
-          worker_phone: '9010000001',
-          notes: 'Customer reported sparking near fuse board.',
-          created_at: new Date().toISOString(),
+          id: Number(id) || 101,
+          service_name: "Fan & light repair",
+          worker_id: 1,
+          worker_name: "Suresh Kumar",
+          worker_phone: "9010000001",
+          customer_id: 11,
+          customer_name: user?.name || "Meena Sundaram",
+          date: new Date().toISOString().split("T")[0],
+          start_time: "10:00",
+          duration_min: 45,
+          status: "CONFIRMED",
+          is_emergency: false,
+          total_amount: 250,
+          service_amount: 225,
+          coop_charge: 25,
+          address: "142, Cross Cut Road, Gandhipuram, Coimbatore",
+          description: "Ceiling fan regulator vibrating and humming loudly.",
         });
+        setUtrNumber(`UTR-TNSC-${id || 101}-OK`);
       }
-    } catch (e) {
-      console.warn('Booking fetch warning:', e);
+    } catch {
+      // Fallback
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyPayment = async () => {
-    if (!utrNumber || utrNumber.length < 6) {
-      Alert.alert('Invalid UTR', 'Please enter a valid 6-12 digit UPI transaction reference (UTR).');
-      return;
-    }
-
+  const handleOpenInvoice = async () => {
+    if (!booking) return;
     try {
-      setSubmittingPayment(true);
-      if (booking) {
-        // Record payment in Supabase payments table
-        await supabase.from('payments').insert([
-          {
-            booking_id: booking.id,
-            amount: booking.total_amount,
-            method: 'UPI',
-            transaction_ref: utrNumber,
-            status: 'COMPLETED',
-          },
-        ]);
+      const inv = await request<InvoiceRecord>(`/invoices/${booking.id}`);
+      setInvoice(inv);
+      setShowInvoice(true);
+    } catch {
+      const total = Number(booking.total_amount) || 250;
+      const workerWage = Number(booking.service_amount) || Math.round(total * 0.9);
+      const coopFee = Number(booking.coop_charge) || Math.round(total - workerWage);
+      setInvoice({
+        id: booking.id,
+        invoice_no: `INV-TN-COOP-2026-${String(booking.id).padStart(4, "0")}`,
+        booking_id: booking.id,
+        date: booking.date,
+        scheduled_date: booking.date,
+        start_time: booking.start_time,
+        total,
+        worker_wage: workerWage,
+        coop_charge: coopFee,
+        payment_status: booking.status === "COMPLETED" ? "PAID" : "UNPAID",
+        customer_name: booking.customer_name,
+        customer_address: booking.address,
+        worker_name: booking.worker_name,
+        worker_phone: booking.worker_phone,
+        service_name: booking.service_name,
+        cooperative_name: "Gandhipuram Labour Cooperative Society",
+        coop_registration_no: "TNCF/CBE/1983/9412",
+        gstin: "33AAAAA0000A1Z5",
+        bank_name: "Tamil Nadu State Apex Cooperative Bank",
+        bank_account_no: "921020045678912",
+        bank_ifsc: "TNSC0001001",
+        items: [
+          { label: `Direct Worker Fair Wage (90% - ${booking.worker_name})`, amount: workerWage },
+          { label: "Cooperative Welfare & Admin Surcharge (10%)", amount: coopFee },
+        ],
+      });
+      setShowInvoice(true);
+    }
+  };
 
-        // Update booking status
-        await supabase
-          .from('bookings')
-          .update({ status: 'COMPLETED' })
-          .eq('id', booking.id);
-
-        setBooking({ ...booking, status: 'COMPLETED' });
-        setPaymentStatus('PAID');
-        Alert.alert('Payment Recorded!', 'Direct cooperative settlement registered. 90% credited to worker wallet.');
-      }
-    } catch (e: any) {
-      setPaymentStatus('PAID');
-      Alert.alert('Payment Recorded (Demo)', 'UPI UTR registered successfully.');
+  const handlePay = async () => {
+    if (!booking) return;
+    setSubmittingPayment(true);
+    try {
+      await request<any>("/payments", {
+        method: "POST",
+        body: JSON.stringify({
+          booking_id: booking.id,
+          succeed: true,
+          method: "Tamil Nadu State Apex Cooperative Bank / UPI URL",
+          transaction_ref: utrNumber,
+        }),
+      });
+      Alert.alert("Payment Complete", "Cooperative statutory settlement completed.");
+      fetchBooking();
+    } catch (err: any) {
+      Alert.alert("Payment Error", err.message || "Payment verification failed");
     } finally {
       setSubmittingPayment(false);
     }
   };
 
-  const handleSubmitRating = async () => {
+  const handleRating = async () => {
+    if (!booking) return;
+    setSubmittingRating(true);
     try {
-      if (booking) {
-        await supabase.from('ratings').insert([
-          {
-            booking_id: booking.id,
-            worker_id: booking.worker_id,
-            customer_id: booking.customer_id,
-            rating,
-            feedback: review,
-          },
-        ]);
-      }
+      await request<any>("/ratings", {
+        method: "POST",
+        body: JSON.stringify({
+          booking_id: booking.id,
+          worker_id: booking.worker_id,
+          rating,
+          feedback: review,
+        }),
+      });
       setRatingSubmitted(true);
-      Alert.alert('Thank You!', 'Your rating supports the cooperative worker rating index.');
-    } catch (e) {
-      setRatingSubmitted(true);
+      Alert.alert("Review Submitted", "Thank you for your rating.");
+    } catch (err: any) {
+      Alert.alert("Rating Error", err.message || "Failed to submit rating");
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
   if (loading || !booking) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1E3A8A" />
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color={colors.brand.primary} />
+        <Text style={styles.loadingText}>Loading booking details...</Text>
       </View>
     );
   }
 
-  const invoiceData: InvoiceRecord = {
-    invoice_number: `ODC-${booking.id.slice(0, 8).toUpperCase()}`,
-    date: new Date(booking.created_at).toLocaleDateString(),
-    customer_name: user?.user_metadata?.full_name || 'Cooperative Patron',
-    customer_phone: user?.phone || '9000000011',
-    customer_address: booking.service_address,
-    worker_name: booking.worker_name || 'Verified Worker',
-    worker_reg_no: 'COOP-TN-0492',
-    service_name: booking.service_name || 'General Service',
-    total_amount: booking.total_amount,
-    worker_wage: booking.worker_wage,
-    cooperative_surcharge: booking.cooperative_surcharge,
-    gst_amount: Math.round(booking.cooperative_surcharge * 0.18),
-    payment_status: paymentStatus,
-    transaction_ref: utrNumber || 'UPI-90492817293',
-  };
-
-  const statusSteps = [
-    { key: 'REQUESTED', label: 'Requested' },
-    { key: 'ACCEPTED', label: 'Accepted' },
-    { key: 'ARRIVED', label: 'Arrived' },
-    { key: 'IN_PROGRESS', label: 'Working' },
-    { key: 'COMPLETED', label: 'Completed' },
-  ];
-
-  const currentStepIndex = statusSteps.findIndex((s) => s.key === booking.status);
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Status Flow Tracker */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Service Status Tracking</Text>
-        <View style={styles.stepperContainer}>
-          {statusSteps.map((step, idx) => {
-            const isDone = idx <= (currentStepIndex !== -1 ? currentStepIndex : 3);
-            const isCurrent = idx === (currentStepIndex !== -1 ? currentStepIndex : 3);
+    <View style={styles.screen}>
+      <MobileHeader />
 
-            return (
-              <View key={step.key} style={styles.stepItem}>
-                <View
-                  style={[
-                    styles.stepDot,
-                    isDone && styles.stepDotDone,
-                    isCurrent && styles.stepDotCurrent,
-                  ]}
-                >
-                  {isDone ? (
-                    <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.stepNum}>{idx + 1}</Text>
-                  )}
-                </View>
-                <Text style={[styles.stepLabel, isCurrent && styles.stepLabelCurrent]}>
-                  {step.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Back Link */}
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={16} color={colors.brand.primary} />
+          <Text style={styles.backBtnText}>{t("dashboard.back_bookings", "Back to Bookings")}</Text>
+        </TouchableOpacity>
 
-      {/* Booking Details Card */}
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>{booking.service_name}</Text>
-          <Text style={styles.bookingRef}>#{booking.id.slice(0, 8)}</Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Ionicons name="location" size={16} color="#DC2626" />
-          <Text style={styles.detailText}>{booking.service_address}</Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar-outline" size={16} color="#64748B" />
-          <Text style={styles.detailText}>
-            {new Date(booking.scheduled_date).toLocaleString()}
-          </Text>
-        </View>
-
-        {booking.photo_url ? (
-          <View style={styles.photoContainer}>
-            <Text style={styles.photoTitle}>Attached Problem Photo:</Text>
-            <Image source={{ uri: booking.photo_url }} style={styles.attachedImage} />
+        {/* Card Top */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={styles.idText}>{t("dashboard.booking_id", "Booking #")}{booking.id}</Text>
+              <Text style={styles.srvTitle}>{booking.service_name}</Text>
+            </View>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusText}>{t("status." + booking.status.toLowerCase(), booking.status)}</Text>
+            </View>
           </View>
-        ) : null}
 
-        {booking.notes ? (
-          <View style={styles.noteBox}>
-            <Text style={styles.noteTitle}>Job Notes / AI Transcript:</Text>
-            <Text style={styles.noteText}>{booking.notes}</Text>
-          </View>
-        ) : null}
-      </View>
+          <View style={styles.divider} />
 
-      {/* Assigned Cooperative Worker */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Assigned Cooperative Specialist</Text>
-        <View style={styles.workerRow}>
-          <View style={styles.workerAvatar}>
-            <Ionicons name="person" size={24} color="#1E3A8A" />
+          {/* Key Meta */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Calendar size={13} color={colors.brand.primary} />
+              <Text style={styles.metaText}>{booking.date}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Clock size={13} color={colors.brand.primary} />
+              <Text style={styles.metaText}>{booking.start_time || "10:00"}</Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
+
+          <View style={styles.metaRow}>
+            <MapPin size={13} color={colors.brand.primary} />
+            <Text style={styles.metaText} numberOfLines={2}>{booking.address}</Text>
+          </View>
+
+          {/* Assigned Worker Box */}
+          <View style={styles.workerBox}>
+            <Text style={styles.boxHeading}>{t("dashboard.assigned_worker", "ASSIGNED TRADESPERSON")}</Text>
             <Text style={styles.workerName}>{booking.worker_name}</Text>
-            <Text style={styles.workerBadge}>✓ Verified Cooperative Member (TN-COOP-0492)</Text>
+            <Text style={styles.workerPhone}>Ph: {booking.worker_phone}</Text>
           </View>
-          {booking.worker_phone && (
-            <TouchableOpacity style={styles.callButton}>
-              <Ionicons name="call" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
-      {/* Fair Wage Financial Breakdown & Invoice Trigger */}
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Fair Wage Transparency</Text>
+          {/* Itemized 90/10 Breakdown */}
+          <View style={styles.breakdownBox}>
+            <Text style={styles.boxHeading}>{t("dashboard.invoice_modal_title", "STATUTORY TARIFF BREAKDOWN")}</Text>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>{t("dashboard.invoice_worker_wage", "Direct Worker Fair Wage (90%)")}</Text>
+              <Text style={styles.wageVal}>₹{(Number(booking.service_amount) || 0).toFixed(2)}</Text>
+            </View>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>{t("dashboard.invoice_coop_fee", "Cooperative Welfare Surcharge (10%)")}</Text>
+              <Text style={styles.feeVal}>₹{(Number(booking.coop_charge) || 0).toFixed(2)}</Text>
+            </View>
+            <View style={[styles.feeRow, styles.totalRow]}>
+              <Text style={styles.totalLabel}>{t("dashboard.invoice_total", "TOTAL AMOUNT")}</Text>
+              <Text style={styles.totalVal}>₹{(Number(booking.total_amount) || 0).toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* View Invoice Button */}
           <TouchableOpacity
-            style={styles.invoiceButton}
-            onPress={() => setShowInvoice(true)}
+            style={styles.invoiceBtn}
+            onPress={handleOpenInvoice}
           >
-            <Ionicons name="receipt-outline" size={14} color="#1E3A8A" />
-            <Text style={styles.invoiceButtonText}>View Tax Invoice</Text>
+            <FileText size={14} color={colors.brand.primary} />
+            <Text style={styles.invoiceBtnText}>{t("dashboard.view_invoice", "View Audited Statutory Tax Invoice")}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.wageRow}>
-          <Text style={styles.wageLabel}>Worker Wage (90% Direct Pay)</Text>
-          <Text style={styles.wageVal}>₹{booking.worker_wage}</Text>
-        </View>
-        <View style={styles.wageRow}>
-          <Text style={styles.wageLabel}>Cooperative Social Security (10%)</Text>
-          <Text style={styles.wageVal}>₹{booking.cooperative_surcharge}</Text>
-        </View>
-        <View style={[styles.wageRow, styles.wageTotalRow]}>
-          <Text style={styles.wageTotalLabel}>Total Amount</Text>
-          <Text style={styles.wageTotalVal}>₹{booking.total_amount}</Text>
-        </View>
-      </View>
+        {/* Payment Section if not completed */}
+        {booking.status !== "COMPLETED" && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t("dashboard.pay_title", "Unified Bank & UPI Payment")}</Text>
+            <Text style={styles.sectionSub}>
+              Transfer via Tamil Nadu State Apex Cooperative Bank or scan UPI code.
+            </Text>
 
-      {/* Payment Settlement Section */}
-      {paymentStatus === 'PENDING' && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Direct UPI Cooperative Settlement</Text>
-          <Text style={styles.paymentSub}>
-            Pay directly to worker UPI ID: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>coop.{booking.worker_phone || '9010000001'}@upi</Text>
-          </Text>
+            <View style={styles.bankBox}>
+              <Building2 size={16} color={colors.brand.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bankName}>Tamil Nadu State Apex Cooperative Bank</Text>
+                <Text style={styles.bankSub}>A/C: 921020045678912 &bull; IFSC: TNSC0001001</Text>
+              </View>
+            </View>
 
-          <View style={styles.utrInputRow}>
+            <Text style={styles.utrLabel}>{t("dashboard.enter_utr", "ENTER BANK TRANSACTION UTR")}</Text>
             <TextInput
-              style={styles.utrInput}
-              placeholder="Enter 12-digit UPI UTR / Ref No."
-              placeholderTextColor="#94A3B8"
               value={utrNumber}
               onChangeText={setUtrNumber}
+              style={styles.utrField}
+              placeholder="12-digit UTR"
             />
+
             <TouchableOpacity
-              style={[styles.verifyButton, submittingPayment && { opacity: 0.7 }]}
-              onPress={handleVerifyPayment}
+              style={styles.payBtn}
+              onPress={handlePay}
               disabled={submittingPayment}
             >
               {submittingPayment ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.verifyButtonText}>Verify Pay</Text>
+                <Text style={styles.payBtnText}>{t("dashboard.confirm_payment", "Verify & Confirm Payment")}</Text>
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Rating & Review */}
-      {paymentStatus === 'PAID' && !ratingSubmitted && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Rate Cooperative Service</Text>
-          <Text style={styles.paymentSub}>Your honest rating directly boosts the worker cooperative score.</Text>
+        {/* Rating Section if completed */}
+        {booking.status === "COMPLETED" && !ratingSubmitted && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t("dashboard.rate_modal_title", "Rate Tradesperson")}</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                  <Star
+                    size={26}
+                    color="#D97706"
+                    fill={s <= rating ? "#D97706" : "transparent"}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                <Ionicons
-                  name={star <= rating ? 'star' : 'star-outline'}
-                  size={32}
-                  color="#F59E0B"
-                />
-              </TouchableOpacity>
-            ))}
+            <TextInput
+              value={review}
+              onChangeText={setReview}
+              placeholder={t("dashboard.rate_feedback_placeholder", "Write feedback for the cooperative society...")}
+              placeholderTextColor={colors.text.subtle}
+              style={styles.reviewInput}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={styles.rateBtn}
+              onPress={handleRating}
+              disabled={submittingRating}
+            >
+              <Text style={styles.rateBtnText}>{t("dashboard.rate_submit", "Submit Rating")}</Text>
+            </TouchableOpacity>
           </View>
-
-          <TextInput
-            style={styles.reviewInput}
-            placeholder="Feedback for cooperative society..."
-            placeholderTextColor="#94A3B8"
-            value={review}
-            onChangeText={setReview}
-          />
-
-          <TouchableOpacity style={styles.submitRatingBtn} onPress={handleSubmitRating}>
-            <Text style={styles.submitRatingBtnText}>Submit Cooperative Review</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
+      </ScrollView>
 
       {/* Invoice Modal */}
       <InvoiceModal
         visible={showInvoice}
-        invoice={invoiceData}
+        invoice={invoice}
         onClose={() => setShowInvoice(false)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface.pageBg,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 40,
-    gap: 14,
+  },
+  loadingBox: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface.pageBg,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: colors.text.muted,
+    marginTop: 8,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 12,
+  },
+  backBtnText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: colors.brand.primary,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-    flex: 1,
-  },
-  bookingRef: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: '#475569',
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
-  },
-  stepperContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  stepItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  stepDotDone: {
-    backgroundColor: '#16A34A',
-  },
-  stepDotCurrent: {
-    backgroundColor: '#1E3A8A',
-  },
-  stepNum: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  stepLabel: {
-    fontSize: 10,
-    color: '#64748B',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  stepLabelCurrent: {
-    fontWeight: '700',
-    color: '#1E3A8A',
-  },
-  photoContainer: {
-    marginTop: 12,
-  },
-  photoTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  attachedImage: {
-    width: '100%',
-    height: 140,
-    borderRadius: 8,
-    backgroundColor: '#0F172A',
-  },
-  noteBox: {
-    marginTop: 12,
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  noteTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  noteText: {
-    fontSize: 13,
-    color: '#1E293B',
-  },
-  workerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  workerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  workerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  workerBadge: {
-    fontSize: 11,
-    color: '#16A34A',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  callButton: {
-    backgroundColor: '#16A34A',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  invoiceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  invoiceButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1E3A8A',
-  },
-  wageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  wageLabel: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  wageVal: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  wageTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 8,
-    marginTop: 6,
-  },
-  wageTotalLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  wageTotalVal: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-  paymentSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  utrInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  utrInput: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 13,
-    height: 44,
-  },
-  verifyButton: {
-    backgroundColor: '#1E3A8A',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  verifyButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
+    borderColor: colors.surface.border,
+    ...shadows.card,
     marginBottom: 14,
   },
-  reviewInput: {
-    backgroundColor: '#F8FAFC',
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  idText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  srvTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.text.primary,
+    marginTop: 2,
+  },
+  statusPill: {
+    backgroundColor: "#ECFDF5",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
+    borderColor: "#A7F3D0",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: radii.full,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#047857",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 8,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 11.5,
+    color: colors.text.secondary,
+    flex: 1,
+  },
+  workerBox: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
     padding: 10,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  boxHeading: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  workerName: {
     fontSize: 13,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  workerPhone: {
+    fontSize: 11,
+    color: colors.text.muted,
+  },
+  breakdownBox: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: radii.lg,
+    padding: 10,
+    gap: 4,
     marginBottom: 12,
   },
-  submitRatingBtn: {
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  feeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  submitRatingBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  feeLabel: {
+    fontSize: 11,
+    color: colors.text.secondary,
+  },
+  wageVal: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: colors.brand.primary,
+  },
+  feeVal: {
+    fontSize: 11,
+    color: colors.text.muted,
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    paddingTop: 6,
+    marginTop: 4,
+  },
+  totalLabel: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: colors.text.primary,
+  },
+  totalVal: {
     fontSize: 14,
+    fontWeight: "900",
+    color: colors.brand.primary,
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  invoiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    paddingVertical: 10,
+    borderRadius: radii.lg,
+  },
+  invoiceBtnText: {
+    color: colors.brand.primary,
+    fontSize: 11.5,
+    fontWeight: "bold",
+  },
+  sectionTitle: {
+    fontSize: 13.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  sectionSub: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginBottom: 10,
+  },
+  bankBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    padding: 10,
+    marginBottom: 10,
+  },
+  bankName: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  bankSub: {
+    fontSize: 10,
+    color: colors.text.muted,
+  },
+  utrLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  utrField: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: colors.text.primary,
+    marginBottom: 12,
+  },
+  payBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 11,
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  payBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "bold",
+  },
+  starsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginVertical: 12,
+  },
+  reviewInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.md,
+    padding: 8,
+    fontSize: 11.5,
+    color: colors.text.primary,
+    minHeight: 50,
+    textAlignVertical: "top",
+    marginBottom: 10,
+  },
+  rateBtn: {
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 10,
+    borderRadius: radii.lg,
+    alignItems: "center",
+  },
+  rateBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "bold",
   },
 });

@@ -134,3 +134,44 @@ export interface LocationItem {
   lat: number;
   lng: number;
 }
+
+export interface WelfareEnrollment {
+  id: number;
+  worker_id: number;
+  benefit_id: number;
+  benefit_name: string;
+  status: string;
+  enrolled_at: string;
+}
+
+export interface InsurancePolicyRecord {
+  id: number;
+  worker_id: number;
+  provider_name: string;
+  policy_ref: string;
+  coverage_type: string;
+  status: string;
+  effective_date?: string;
+  expiry_date?: string;
+  is_demo: boolean;
+  demo_notice: string;
+}
+
+export interface AppNotification {
+  id: number;
+  title: string;
+  body: string;
+  is_read: boolean;
+  date: string;
+}
+
+export interface RatingRecord {
+  id: number;
+  booking_id: number;
+  worker_id: number;
+  customer_id: number;
+  rating: number;
+  feedback?: string;
+  created_at?: string;
+}
+

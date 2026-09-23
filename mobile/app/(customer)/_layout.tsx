@@ -1,62 +1,71 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { Home, Search, Calendar, Clock, User } from "lucide-react-native";
+import { useLang } from "../../lib/i18n";
+import { colors } from "../../lib/theme";
+import { Home, Grid, Calendar, Clock } from "lucide-react-native";
 
 export default function CustomerTabsLayout() {
+  const { t } = useLang();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#059669",
-        tabBarInactiveTintColor: "#64748b",
+        tabBarActiveTintColor: colors.brand.primary, // #0F5132
+        tabBarInactiveTintColor: colors.text.muted,    // #64748B
         tabBarStyle: {
-          backgroundColor: "#ffffff",
+          backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
-          borderTopColor: "#e2e8f0",
+          borderTopColor: colors.surface.border,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: "600",
+          fontWeight: "700",
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("nav.home", "Home"),
+          tabBarLabel: t("nav.home", "Home"),
           tabBarIcon: ({ color, size }) => <Home size={size || 20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="services"
         options={{
-          title: "Services",
-          tabBarIcon: ({ color, size }) => <Search size={size || 20} color={color} />,
+          title: t("nav.services", "Services"),
+          tabBarLabel: t("nav.services", "Services"),
+          tabBarIcon: ({ color, size }) => <Grid size={size || 20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="book"
         options={{
-          title: "Book with AI",
+          title: t("nav.book_tab", "Book with AI"),
+          tabBarLabel: t("nav.book_tab", "Book with AI"),
           tabBarIcon: ({ color, size }) => <Calendar size={size || 20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
-          title: "My Bookings",
+          title: t("nav.bookings", "My Bookings"),
+          tabBarLabel: t("nav.bookings", "My Bookings"),
           tabBarIcon: ({ color, size }) => <Clock size={size || 20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="booking/[id]"
         options={{
-          href: null, // Hidden from bottom bar, accessed via stack navigation
+          href: null, // Hidden from tab bar
         }}
       />
     </Tabs>
   );
 }
+

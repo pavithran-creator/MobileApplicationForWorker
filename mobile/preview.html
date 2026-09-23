@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ON-DEMAND Mobile App Interactive Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #047857;
+      --primary-dark: #064E3B;
+      --primary-light: #ECFDF5;
+      --primary-border: #A7F3D0;
+      --accent: #D97706;
+      --danger: #DC2626;
+      --bg: #0F172A;
+      --phone-bg: #FAFAFA;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: linear-gradient(135deg, #090D16 0%, #0F172A 50%, #111E2E 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
+      color: #F8FAFC;
+    }
+
+    .header-bar {
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 25px;
+    }
+
+    .badge-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(4, 120, 87, 0.2);
+      border: 1px solid rgba(167, 243, 208, 0.4);
+      color: #6EE7B7;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .main-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #FFFFFF, #CBD5E1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .sub-title {
+      color: #94A3B8;
+      font-size: 14px;
+    }
+
+    /* Interactive Controls */
+    .controls-panel {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      padding: 8px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ctrl-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #94A3B8;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .ctrl-btn:hover {
+      color: #F8FAFC;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .ctrl-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(4, 120, 87, 0.4);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Phone Mockup Frame */
+    .phone-container {
+      position: relative;
+      width: 390px;
+      height: 800px;
+      background: #000000;
+      border-radius: 50px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8),
+                  0 0 0 10px #1E293B,
+                  0 0 0 12px #334155;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island Notch */
+    .notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+    }
+
+    .notch-camera {
+      width: 10px;
+      height: 10px;
+      background: #111827;
+      border: 2px solid #1F2937;
+      border-radius: 50%;
+    }
+
+    .notch-sensor {
+      width: 6px;
+      height: 6px;
+      background: #111827;
+      border-radius: 50%;
+    }
+
+    /* Screen Area */
+    .screen-area {
+      flex: 1;
+      background: var(--phone-bg);
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen-area::-webkit-scrollbar {
+      width: 4px;
+    }
+    .screen-area::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 44px;
+      padding: 12px 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0F172A;
+      background: #FFFFFF;
+      z-index: 100;
+    }
+
+    .status-bar.dark {
+      background: var(--primary-dark);
+      color: #FFFFFF;
+    }
+
+    /* App Header */
+    .app-header {
+      background: var(--primary-dark);
+      color: #FFFFFF;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-badge {
+      width: 32px;
+      height: 32px;
+      background: #047857;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 14px;
+      color: #A7F3D0;
+      border: 1px solid #059669;
+    }
+
+    .logo-text h1 {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+
+    .logo-text p {
+      font-size: 9px;
+      color: #A7F3D0;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .lang-pill {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #FFFFFF;
+      cursor: pointer;
+    }
+
+    /* View Sections */
+    .view-content {
+      display: none;
+      padding: 16px;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .view-content.active {
+      display: flex;
+    }
+
+    /* Customer View Styles */
+    .hero-card {
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .coop-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ECFDF5;
+      color: #047857;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 99px;
+      margin-bottom: 8px;
+      border: 1px solid #A7F3D0;
+    }
+
+    .hero-h {
+      font-size: 21px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.25;
+      letter-spacing: -0.5px;
+    }
+
+    .hero-p {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+
+    /* Services Grid */
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .srv-item {
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 12px 6px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s ease;
+    }
+
+    .srv-item:active {
+      transform: scale(0.96);
+    }
+
+    .srv-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+
+    .srv-eta {
+      font-size: 8px;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 99px;
+      background: #FFFFFF;
+      border: 1px solid #059669;
+      color: #059669;
+      margin-top: -12px;
+      margin-bottom: 4px;
+      z-index: 2;
+    }
+
+    .srv-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    /* SOS Red Card */
+    .sos-card {
+      background: linear-gradient(135deg, #DC2626, #B91C1C);
+      color: #FFFFFF;
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+      cursor: pointer;
+    }
+
+    .sos-icon-box {
+      width: 42px;
+      height: 42px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .sos-text h3 {
+      font-size: 13px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sos-sla {
+      background: rgba(255, 255, 255, 0.25);
+      font-size: 8.5px;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .sos-text p {
+      font-size: 10.5px;
+      color: #FEE2E2;
+      margin-top: 3px;
+    }
+
+    /* Personas Section */
+    .demo-personas {
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .persona-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-top: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .persona-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #FFFFFF;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .persona-avatar.worker {
+      background: #0284C7;
+    }
+
+    /* Worker Portal Screen */
+    .worker-header {
+      background: #064E3B;
+      border-radius: 16px;
+      padding: 16px;
+      color: #FFFFFF;
+    }
+
+    .worker-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .duty-switch {
+      background: #047857;
+      border: 1px solid #10B981;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #A7F3D0;
+    }
+
+    .duty-dot {
+      width: 8px;
+      height: 8px;
+      background: #34D399;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #34D399;
+    }
+
+    .earning-box {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+
+    .earning-val {
+      font-size: 26px;
+      font-weight: 900;
+      color: #34D399;
+    }
+
+    .wage-split-pill {
+      display: inline-block;
+      background: rgba(52, 211, 153, 0.2);
+      color: #A7F3D0;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 99px;
+      margin-top: 4px;
+    }
+
+    .job-card {
+      background: #FFFFFF;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 14px;
+    }
+
+    .audio-player-pill {
+      background: #F1F5F9;
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .play-circle {
+      width: 26px;
+      height: 26px;
+      background: var(--primary);
+      border-radius: 50%;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn-accept {
+      flex: 1;
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .btn-decline {
+      background: #F1F5F9;
+      color: #64748B;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Multimodal Booking Screen */
+    .cam-frame {
+      background: #000000;
+      border-radius: 14px;
+      height: 190px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-size: cover;
+      background-position: center;
+      background-image: url('https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&auto=format&fit=crop&q=80');
+    }
+
+    .reticle {
+      position: absolute;
+      inset: 15px;
+      border: 1px dashed rgba(255, 255, 255, 0.6);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .live-badge {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #F87171;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .mic-container {
+      background: #FFFFFF;
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mic-btn-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10B981, #047857);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Bottom Nav */
+    .bottom-bar {
+      height: 60px;
+      background: #FFFFFF;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px;
+      z-index: 10;
+    }
+
+    .nav-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      color: #94A3B8;
+      font-size: 9.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+
+    .nav-tab.active {
+      color: var(--primary);
+    }
+
+    .nav-icon {
+      font-size: 17px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-bar">
+    <div class="badge-top">🏛️ TAMIL NADU LABOUR COOPERATIVE FEDERATION</div>
+    <h1 class="main-title">ON-DEMAND Mobile App Simulator</h1>
+    <p class="sub-title">Standalone interactive preview reproducing the Expo React Native mobile application</p>
+  </div>
+
+  <!-- Interactive Controls -->
+  <div class="controls-panel">
+    <button class="ctrl-btn active" onclick="switchTab('customer')">
+      <span>👤</span> Customer Home
+    </button>
+    <button class="ctrl-btn" onclick="switchTab('booking')">
+      <span>📷</span> Multimodal AI Booking
+    </button>
+    <button class="ctrl-btn" onclick="switchTab('worker')">
+      <span>⚡</span> Worker Portal
+    </button>
+    <button class="ctrl-btn" onclick="switchTab('emergency')">
+      <span>🚨</span> 24/7 SOS Dispatch
+    </button>
+  </div>
+
+  <!-- Phone Mockup -->
+  <div class="phone-container">
+    <!-- Dynamic Island -->
+    <div class="notch">
+      <div class="notch-camera"></div>
+      <div class="notch-sensor"></div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <span>9:41</span>
+      <span>📶 5G &nbsp; 88%</span>
+    </div>
+
+    <!-- App Header -->
+    <div class="app-header">
+      <div class="logo-row">
+        <div class="logo-badge">OD</div>
+        <div class="logo-text">
+          <h1>ON-DEMAND</h1>
+          <p>LABOUR COOPERATIVE</p>
+        </div>
+      </div>
+      <div class="lang-pill" id="langPill" onclick="toggleLang()">
+        🌐 EN / தமிழ்
+      </div>
+    </div>
+
+    <!-- Scrollable Screen Area -->
+    <div class="screen-area">
+
+      <!-- 1. CUSTOMER PORTAL -->
+      <div id="view-customer" class="view-content active">
+        <div class="hero-card">
+          <div class="coop-tag">
+            <span>🛡️</span> VERIFIED COOPERATIVE REGISTRY
+          </div>
+          <h2 class="hero-h">Home services at your doorstep</h2>
+          <p class="hero-p">Cooperative-owned digital service marketplace providing verified household trade services with fair wages.</p>
+        </div>
+
+        <!-- SOS Banner -->
+        <div class="sos-card" onclick="switchTab('emergency')">
+          <div class="sos-icon-box">⚠️</div>
+          <div class="sos-text">
+            <h3>24/7 Rapid Emergency <span class="sos-sla">&lt; 15 MINS</span></h3>
+            <p>Electrical hazards, pipe bursts, and emergency lockouts dispatched immediately.</p>
+          </div>
+        </div>
+
+        <!-- Service Categories -->
+        <h3 class="section-title">Cooperative Trade Categories</h3>
+        <div class="services-grid">
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#FFFBEB; color:#D97706;">⚡</div>
+            <div class="srv-eta">30 mins</div>
+            <div class="srv-title">Electrician</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#EFF6FF; color:#2563EB;">💧</div>
+            <div class="srv-eta">30 mins</div>
+            <div class="srv-title">Plumber</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#FEF3C7; color:#B45309;">🔨</div>
+            <div class="srv-eta">45 mins</div>
+            <div class="srv-title">Carpenter</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#ECFDF5; color:#059669;">🎨</div>
+            <div class="srv-eta">Scheduled</div>
+            <div class="srv-title">House Paint</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#EEF2FF; color:#4F46E5;">🚗</div>
+            <div class="srv-eta">45 mins</div>
+            <div class="srv-title">Driver</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#ECFEFF; color:#0891B2;">✨</div>
+            <div class="srv-eta">45 mins</div>
+            <div class="srv-title">Cleaning</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('booking')">
+            <div class="srv-icon" style="background:#FFF1F2; color:#E11D48;">🤝</div>
+            <div class="srv-eta">Certified</div>
+            <div class="srv-title">Elder Care</div>
+          </div>
+          <div class="srv-item" onclick="switchTab('emergency')">
+            <div class="srv-icon" style="background:#FEF2F2; color:#DC2626;">🚨</div>
+            <div class="srv-eta" style="border-color:#DC2626; color:#DC2626;">15 mins</div>
+            <div class="srv-title">Emergency</div>
+          </div>
+        </div>
+
+        <!-- 1-Click Demo Personas -->
+        <div class="demo-personas">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4 style="font-size:12px; font-weight:800; color:var(--text);">1-Click Instant Demo Personas</h4>
+            <span style="font-size:9px; background:#FEF3C7; color:#92400E; font-weight:800; padding:2px 6px; border-radius:4px;">INSTANT</span>
+          </div>
+
+          <div class="persona-btn" onclick="switchTab('customer')">
+            <div class="persona-avatar">M</div>
+            <div style="flex:1;">
+              <div style="font-size:11.5px; font-weight:800; color:var(--text);">Meena Sundaram (Customer)</div>
+              <div style="font-size:10px; color:var(--text-muted);">Browse trades & AI problem capture</div>
+            </div>
+            <span style="color:var(--primary); font-size:14px;">➔</span>
+          </div>
+
+          <div class="persona-btn" onclick="switchTab('worker')">
+            <div class="persona-avatar worker">S</div>
+            <div style="flex:1;">
+              <div style="font-size:11.5px; font-weight:800; color:var(--text);">Suresh Kumar (Electrician)</div>
+              <div style="font-size:10px; color:var(--text-muted);">90% fair wage earnings & incoming jobs</div>
+            </div>
+            <span style="color:#0284C7; font-size:14px;">➔</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MULTIMODAL BOOKING SCREEN -->
+      <div id="view-booking" class="view-content">
+        <h3 class="section-title">Live Multimodal Problem Capture</h3>
+
+        <!-- Live Camera Viewfinder -->
+        <div class="cam-frame">
+          <div class="reticle"></div>
+          <div class="live-badge">📷 LIVE CAPTURE 20:30 • WATERMARKED</div>
+        </div>
+
+        <!-- Voice Recorder -->
+        <div class="mic-container">
+          <div class="mic-btn-circle">🎙️</div>
+          <div style="flex:1;">
+            <div style="font-size:11.5px; font-weight:800; color:var(--primary);">Voice Note (Tamil / English)</div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">"Pipe leaking under kitchen sink, water pressure drop..."</div>
+          </div>
+        </div>
+
+        <!-- Dispatch Details -->
+        <div style="background:#FFFFFF; border-radius:14px; padding:14px; border:1px solid var(--border);">
+          <div style="font-size:10.5px; font-weight:700; color:var(--text-muted);">DISPATCH ADDRESS</div>
+          <div style="font-size:12px; font-weight:800; color:var(--text); margin-top:2px;">📍 42, 2nd Avenue, Anna Nagar West, Chennai</div>
+          
+          <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:10px; color:var(--text-muted);">Statutory Price</div>
+              <div style="font-size:16px; font-weight:900; color:var(--primary);">₹350</div>
+            </div>
+            <span style="background:#ECFDF5; color:#047857; font-size:9.5px; font-weight:800; padding:4px 8px; border-radius:6px;">90% Fair Wage Guaranteed</span>
+          </div>
+        </div>
+
+        <button style="background:var(--primary); color:#FFFFFF; border:none; padding:12px; border-radius:12px; font-weight:800; font-size:13px; cursor:pointer;" onclick="alert('Worker Dispatched! Suresh Kumar (4.9 ★) arriving in 18 minutes.')">
+          Confirm & Dispatch Cooperative Worker ➔
+        </button>
+      </div>
+
+      <!-- 3. WORKER PORTAL -->
+      <div id="view-worker" class="view-content">
+        <div class="worker-header">
+          <div class="worker-top-row">
+            <div>
+              <div style="font-size:14px; font-weight:800;">Suresh Kumar</div>
+              <div style="font-size:10.5px; color:#A7F3D0;">Master Electrician • 4.9 ★ (184 jobs)</div>
+            </div>
+            <div class="duty-switch">
+              <div class="duty-dot"></div>
+              <span>ON DUTY</span>
+            </div>
+          </div>
+
+          <div class="earning-box">
+            <div style="font-size:10px; color:#A7F3D0; font-weight:700;">TODAY'S ACCRUED EARNINGS</div>
+            <div class="earning-val">₹1,850</div>
+            <div class="wage-split-pill">90% Direct Fair Wage</div>
+          </div>
+          <div style="font-size:10px; color:#A7F3D0; margin-top:6px;">Cooperative Welfare & PMSBY Fund: <strong>₹205</strong></div>
+        </div>
+
+        <h3 class="section-title">Incoming Cooperative Job Request</h3>
+
+        <div class="job-card">
+          <div style="display:flex; justify-content:space-between;">
+            <div style="font-size:12.5px; font-weight:800; color:var(--text);">Short Circuit & Breaker Trip</div>
+            <span style="background:#FEF2F2; color:#DC2626; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">URGENT</span>
+          </div>
+          <div style="font-size:10.5px; color:var(--text-muted); margin-top:3px;">Client: Meena S. • Anna Nagar West (1.2 km away)</div>
+
+          <div class="audio-player-pill">
+            <div class="play-circle">▶</div>
+            <span>Customer Voice Note (0:18s)</span>
+          </div>
+
+          <div class="action-row">
+            <button class="btn-accept" onclick="alert('Job Accepted! Navigating to Meena Sundaram location.')">ACCEPT JOB (₹450)</button>
+            <button class="btn-decline">DECLINE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. EMERGENCY SOS -->
+      <div id="view-emergency" class="view-content">
+        <div style="background:#FEF2F2; border:1px solid #FCA5A5; border-radius:16px; padding:16px; text-align:center;">
+          <div style="font-size:40px;">🚨</div>
+          <h2 style="font-size:18px; font-weight:900; color:#991B1B; margin-top:6px;">24/7 Rapid Emergency Dispatch</h2>
+          <p style="font-size:11.5px; color:#B91C1C; margin-top:4px;">Guaranteed &lt; 15-Minute SLA arrival by nearest certified cooperative tradesperson.</p>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="alert('Emergency Electrician Dispatched! ETA: 12 minutes.')">
+            <span style="font-size:24px;">⚡</span>
+            <div style="flex:1;">
+              <div style="font-size:12px; font-weight:800; color:var(--text);">Electrical Hazard / Sparks / Blackout</div>
+              <div style="font-size:10px; color:var(--text-muted);">SLA: 15 mins • Verified Electrician</div>
+            </div>
+            <span style="color:var(--danger); font-weight:800; font-size:11px;">CALL ➔</span>
+          </div>
+
+          <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="alert('Emergency Plumber Dispatched! ETA: 15 minutes.')">
+            <span style="font-size:24px;">💧</span>
+            <div style="flex:1;">
+              <div style="font-size:12px; font-weight:800; color:var(--text);">Main Pipe Burst / Major Water Inflow</div>
+              <div style="font-size:10px; color:var(--text-muted);">SLA: 15 mins • Verified Plumber</div>
+            </div>
+            <span style="color:var(--danger); font-weight:800; font-size:11px;">CALL ➔</span>
+          </div>
+
+          <div style="background:#FFFFFF; border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; align-items:center; gap:12px; cursor:pointer;" onclick="alert('Emergency Lockout Dispatched! ETA: 20 minutes.')">
+            <span style="font-size:24px;">🔑</span>
+            <div style="flex:1;">
+              <div style="font-size:12px; font-weight:800; color:var(--text);">Door Lockout / Broken Key Lock</div>
+              <div style="font-size:10px; color:var(--text-muted);">SLA: 20 mins • Verified Locksmith</div>
+            </div>
+            <span style="color:var(--danger); font-weight:800; font-size:11px;">CALL ➔</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-bar">
+      <div class="nav-tab active" id="tab-home" onclick="switchTab('customer')">
+        <span class="nav-icon">🏠</span>
+        <span>Home</span>
+      </div>
+      <div class="nav-tab" id="tab-services" onclick="switchTab('booking')">
+        <span class="nav-icon">🛠️</span>
+        <span>Book</span>
+      </div>
+      <div class="nav-tab" id="tab-worker" onclick="switchTab('worker')">
+        <span class="nav-icon">👷</span>
+        <span>Worker</span>
+      </div>
+      <div class="nav-tab" id="tab-sos" onclick="switchTab('emergency')">
+        <span class="nav-icon">🚨</span>
+        <span>SOS</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      // Hide all views
+      document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+      // Show targeted view
+      const targetView = document.getElementById('view-' + tab);
+      if (targetView) targetView.classList.add('active');
+
+      // Update control button
+      const activeBtn = Array.from(document.querySelectorAll('.ctrl-btn')).find(b => b.getAttribute('onclick').includes(tab));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update bottom nav
+      const activeNav = {
+        'customer': 'tab-home',
+        'booking': 'tab-services',
+        'worker': 'tab-worker',
+        'emergency': 'tab-sos'
+      }[tab];
+      if (activeNav) document.getElementById(activeNav).classList.add('active');
+    }
+
+    let isTamil = false;
+    function toggleLang() {
+      isTamil = !isTamil;
+      const pill = document.getElementById('langPill');
+      if (isTamil) {
+        pill.innerText = '🌐 தமிழ் / TA';
+        document.querySelector('.hero-h').innerText = 'உங்கள் வீட்டு வாசலில் சேவை';
+      } else {
+        pill.innerText = '🌐 EN / தமிழ்';
+        document.querySelector('.hero-h').innerText = 'Home services at your doorstep';
+      }
+    }
+  </script>
+</body>
+</html>

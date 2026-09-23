@@ -1,377 +1,657 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TextInput,
+  TouchableOpacity,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { getCurrentGpsLocation } from '../lib/location';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
-
-const EMERGENCY_SERVICES = [
-  {
-    id: 'em-1',
-    trade: 'Electrical Hazard',
-    icon: 'flash',
-    desc: 'Sparking, short circuit, total blackout, smoking fuse box',
-    sla: '15 Mins SLA',
-  },
-  {
-    id: 'em-2',
-    trade: 'Water Pipe Burst',
-    icon: 'water',
-    desc: 'Severe indoor flooding, main supply pipe burst, broken valve',
-    sla: '15 Mins SLA',
-  },
-  {
-    id: 'em-3',
-    trade: 'Emergency Locksmith',
-    icon: 'key',
-    desc: 'Locked out of house, jammed main deadbolt, elderly inside',
-    sla: '20 Mins SLA',
-  },
-];
+} from "react-native";
+import { useRouter } from "expo-router";
+import MobileHeader from "../components/Header";
+import { useAuth } from "../lib/auth";
+import { useLang } from "../lib/i18n";
+import { request } from "../lib/api";
+import {
+  getCurrentDeviceLocation,
+  getStoredLocation,
+  setStoredLocation,
+  onLocationChange,
+} from "../lib/location";
+import { colors, radii, shadows } from "../lib/theme";
+import { ServiceItem, MatchedWorker } from "../types";
+import {
+  AlertTriangle,
+  MapPin,
+  Clock,
+  Phone,
+  ShieldCheck,
+  Zap,
+  Droplets,
+  Hammer,
+  CheckCircle2,
+  ArrowRight,
+  X,
+} from "lucide-react-native";
 
 export default function EmergencyScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { lang, t } = useLang();
 
-  const [selectedEmergency, setSelectedEmergency] = useState('em-1');
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [dispatching, setDispatching] = useState(false);
-  const [dispatched, setDispatched] = useState(false);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<number>(1);
+  const [address, setAddress] = useState("Gandhipuram, Coimbatore");
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({ lat: 11.0168, lng: 76.9558 });
+  const [description, setDescription] = useState("Urgent breakdown, immediate technician needed");
+
+  // Search state
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [emergencyResult, setEmergencyResult] = useState<any | null>(null);
+
+  // Dispatch state
+  const [dispatchLoadingId, setDispatchLoadingId] = useState<number | null>(null);
+  const [dispatchSuccess, setDispatchSuccess] = useState<any | null>(null);
 
   useEffect(() => {
-    fetchLocation();
+    // 1. Fetch catalog services
+    request<ServiceItem[]>("/catalog/services")
+      .then((srvs) => {
+        if (Array.isArray(srvs) && srvs.length > 0) {
+          setServices(srvs);
+          setSelectedServiceId(srvs[0].id);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch cached location first
+    getStoredLocation().then((cached) => {
+      if (cached) {
+        if (cached.address) setAddress(cached.address);
+        else if (cached.name) setAddress(cached.name);
+        if (cached.lat && cached.lng) {
+          setUserCoords({ lat: cached.lat, lng: cached.lng });
+        }
+      }
+    });
+
+    // 3. Listen to cross-app location updates
+    const unsubscribe = onLocationChange((loc) => {
+      if (loc) {
+        if (loc.address) setAddress(loc.address);
+        else if (loc.name) setAddress(loc.name);
+        if (loc.lat && loc.lng) {
+          setUserCoords({ lat: loc.lat, lng: loc.lng });
+        }
+      }
+    });
+
+    // 4. Fetch fresh device GPS
+    getCurrentDeviceLocation()
+      .then((loc) => {
+        if (loc) {
+          if (loc.address) setAddress(loc.address);
+          else if (loc.name) setAddress(loc.name);
+          if (loc.lat && loc.lng) {
+            setUserCoords({ lat: loc.lat, lng: loc.lng });
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
-  const fetchLocation = async () => {
-    const loc = await getCurrentGpsLocation();
-    setCoords({ latitude: loc.latitude, longitude: loc.longitude });
+  const handleSearchEmergency = async () => {
+    setLoadingSearch(true);
+    setEmergencyResult(null);
+    setDispatchSuccess(null);
+
+    try {
+      const res: any = await request<any>("/emergency-requests", {
+        method: "POST",
+        body: JSON.stringify({
+          service_id: selectedServiceId,
+          address,
+          description,
+          lat: userCoords.lat,
+          lng: userCoords.lng,
+        }),
+      });
+
+      setEmergencyResult(res);
+    } catch (err: any) {
+      Alert.alert(t("common.error", "Emergency Error"), err.message || "Failed to find emergency workers");
+    } finally {
+      setLoadingSearch(false);
+    }
   };
 
-  const handleTriggerSOS = async () => {
+  const handleDispatchWorker = async (workerId: number) => {
+    setDispatchLoadingId(workerId);
     try {
-      setDispatching(true);
-      const chosen = EMERGENCY_SERVICES.find((s) => s.id === selectedEmergency);
+      const res: any = await request<any>(`/emergency-requests/991/dispatch`, {
+        method: "POST",
+        body: JSON.stringify({
+          worker_id: workerId,
+          address,
+          lat: userCoords.lat,
+          lng: userCoords.lng,
+        }),
+      });
 
-      // Create emergency dispatch in Supabase bookings
-      if (user) {
-        await supabase.from('bookings').insert([
-          {
-            customer_id: user.id,
-            status: 'REQUESTED',
-            scheduled_date: new Date().toISOString(),
-            total_amount: 499,
-            worker_wage: 449,
-            cooperative_surcharge: 50,
-            service_address: `GPS: ${coords?.latitude.toFixed(4)}, ${coords?.longitude.toFixed(4)} (Emergency Dispatch)`,
-            notes: `EMERGENCY SOS: ${chosen?.trade} triggered. Immediate cooperative dispatch needed.`,
-          },
-        ]);
-      }
-
-      setDispatched(true);
-    } catch (e: any) {
-      setDispatched(true);
+      setDispatchSuccess(res);
+    } catch (err: any) {
+      Alert.alert(t("common.error", "Dispatch Error"), err.message || "Failed to dispatch worker");
     } finally {
-      setDispatching(false);
+      setDispatchLoadingId(null);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Red Alert Header */}
-      <View style={styles.alertBanner}>
-        <View style={styles.alertIconCircle}>
-          <Ionicons name="warning" size={28} color="#DC2626" />
-        </View>
-        <Text style={styles.alertTitle}>24/7 Cooperative Emergency SOS</Text>
-        <Text style={styles.alertSub}>
-          Dispatches nearest verified cooperative technician with guaranteed 15-minute on-site response.
-        </Text>
-      </View>
+    <View style={styles.screen}>
+      <MobileHeader title="Emergency Dispatch" showEmergency={false} />
 
-      {/* GPS Location Status */}
-      <View style={styles.locationCard}>
-        <Ionicons name="navigate-circle" size={22} color="#1E3A8A" />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.locTitle}>Current GPS Broadcast Location</Text>
-          <Text style={styles.locCoords}>
-            {coords ? `${coords.latitude.toFixed(4)}° N, ${coords.longitude.toFixed(4)}° E (High Accuracy)` : 'Locating satellite fix...'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Emergency Category Selection */}
-      <Text style={styles.sectionTitle}>Select Emergency Category</Text>
-
-      {EMERGENCY_SERVICES.map((item) => {
-        const isSelected = selectedEmergency === item.id;
-        return (
-          <TouchableOpacity
-            key={item.id}
-            style={[styles.emergencyOption, isSelected && styles.emergencyOptionActive]}
-            onPress={() => setSelectedEmergency(item.id)}
-          >
-            <View style={[styles.optionIconBox, isSelected && styles.optionIconBoxActive]}>
-              <Ionicons name={item.icon as any} size={24} color={isSelected ? '#FFFFFF' : '#DC2626'} />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {/* Emergency Alert Header Banner */}
+        <View style={styles.alertBanner}>
+          <View style={styles.alertTopRow}>
+            <View style={styles.alertPill}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.alertPillText}>24/7 COOPERATIVE PRIORITY</Text>
             </View>
-
-            <View style={{ flex: 1 }}>
-              <View style={styles.optionTopRow}>
-                <Text style={styles.optionTrade}>{item.trade}</Text>
-                <View style={styles.slaBadge}>
-                  <Text style={styles.slaText}>{item.sla}</Text>
-                </View>
-              </View>
-              <Text style={styles.optionDesc}>{item.desc}</Text>
+            <View style={styles.slaBadge}>
+              <Text style={styles.slaText}>&lt; 30 MINS</Text>
             </View>
-          </TouchableOpacity>
-        );
-      })}
-
-      {/* Big Red SOS Button */}
-      {!dispatched ? (
-        <TouchableOpacity
-          style={[styles.sosButton, dispatching && { opacity: 0.7 }]}
-          onPress={handleTriggerSOS}
-          disabled={dispatching}
-        >
-          {dispatching ? (
-            <ActivityIndicator color="#FFFFFF" size="large" />
-          ) : (
-            <>
-              <Ionicons name="flash" size={24} color="#FFFFFF" />
-              <Text style={styles.sosButtonText}>CONFIRM EMERGENCY DISPATCH</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.dispatchedCard}>
-          <Ionicons name="checkmark-circle" size={44} color="#16A34A" />
-          <Text style={styles.dispatchedTitle}>Emergency Technician Dispatched!</Text>
-          <Text style={styles.dispatchedSub}>
-            Suresh Kumar (Certified Master Electrician) is en route to your GPS location.
-          </Text>
-          <View style={styles.etaBox}>
-            <Text style={styles.etaText}>Estimated Arrival: 11 minutes</Text>
           </View>
-          <TouchableOpacity
-            style={styles.backHomeBtn}
-            onPress={() => router.replace('/(customer)')}
-          >
-            <Text style={styles.backHomeText}>Return to Customer Home</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {/* Back button */}
-      <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-        <Text style={styles.cancelBtnText}>Back</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <Text style={styles.alertTitle}>
+            {t("emergency.title", "24/7 Priority Emergency Dispatch")}
+          </Text>
+          <Text style={styles.alertSub}>
+            {t(
+              "emergency.subtitle",
+              "Urgent short-circuits, burst pipes, and lock emergencies dispatched with guaranteed immediate arrival."
+            )}
+          </Text>
+        </View>
+
+
+        {/* Dispatch Confirmation Card if successfully dispatched */}
+        {dispatchSuccess ? (
+          <View style={styles.successCard}>
+            <View style={styles.successHeader}>
+              <CheckCircle2 size={24} color="#16A34A" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.successTitle}>Emergency Technician Dispatched!</Text>
+                <Text style={styles.successSub}>
+                  Assigned {dispatchSuccess.worker?.name || "Suresh Kumar"} &bull; On route
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.etaBox}>
+              <Text style={styles.etaLabel}>ESTIMATED ARRIVAL TIME</Text>
+              <Text style={styles.etaTime}>12 - 15 Minutes</Text>
+              <Text style={styles.etaSub}>Direct priority GPS tracking active</Text>
+            </View>
+
+            <View style={styles.dispatchedWorkerBox}>
+              <Text style={styles.workerLabel}>TECHNICIAN DETAILS</Text>
+              <Text style={styles.dispatchedName}>
+                {dispatchSuccess.worker?.name || "Suresh Kumar (Electrician)"}
+              </Text>
+              <Text style={styles.dispatchedPhone}>Phone: 9010000001</Text>
+              <Text style={styles.dispatchedAddress}>Address: {address}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.backHomeBtn}
+              onPress={() => router.replace("/(customer)")}
+            >
+              <Text style={styles.backHomeBtnText}>Go to Home</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* Request Form */
+          <View style={styles.formCard}>
+            <Text style={styles.formSectionTitle}>1. Select Emergency Trade</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {[
+                { id: 1, name: "Electrical Breakdown", icon: <Zap size={14} color="#D97706" /> },
+                { id: 3, name: "Burst Pipe & Plumbing", icon: <Droplets size={14} color="#2563EB" /> },
+                { id: 5, name: "Lockout & Door Jam", icon: <Hammer size={14} color="#B45309" /> },
+              ].map((tItem) => (
+                <TouchableOpacity
+                  key={tItem.id}
+                  style={[
+                    styles.tradeChip,
+                    selectedServiceId === tItem.id && styles.tradeChipActive,
+                  ]}
+                  onPress={() => setSelectedServiceId(tItem.id)}
+                >
+                  {tItem.icon}
+                  <Text
+                    style={[
+                      styles.tradeChipText,
+                      selectedServiceId === tItem.id && styles.tradeChipTextActive,
+                    ]}
+                  >
+                    {tItem.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.formSectionTitle}>2. Service Location</Text>
+            <View style={styles.locBox}>
+              <MapPin size={16} color={colors.status.danger} />
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                style={styles.locInput}
+                placeholder="Door No, Street, Landmark"
+              />
+            </View>
+
+            <Text style={styles.formSectionTitle}>3. Emergency Description</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Describe emergency situation..."
+              placeholderTextColor={colors.text.subtle}
+              style={styles.descInput}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={styles.findBtn}
+              onPress={handleSearchEmergency}
+              disabled={loadingSearch}
+              activeOpacity={0.85}
+            >
+              {loadingSearch ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.findBtnText}>Find Available Emergency Workers</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Emergency Candidates List */}
+        {emergencyResult && !dispatchSuccess && (
+          <View style={styles.candidatesCard}>
+            <View style={styles.candidatesHeader}>
+              <Text style={styles.candidatesTitle}>Available Emergency Technicians</Text>
+              <Text style={styles.candidatesSub}>Guaranteed on-call within your 5 km radius</Text>
+            </View>
+
+            {emergencyResult.candidates?.map((cand: MatchedWorker) => (
+              <View key={cand.worker_id} style={styles.candItem}>
+                <View style={styles.candLeft}>
+                  <View style={styles.candAvatar}>
+                    <Text style={styles.candAvatarText}>{cand.name.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.candName}>{cand.name}</Text>
+                    <Text style={styles.candCoop}>{cand.cooperative_name}</Text>
+                    <View style={styles.candMeta}>
+                      <Text style={styles.candDist}>📍 {cand.distance_km || "1.2"} km away</Text>
+                      <Text style={styles.candRating}>★ {cand.avg_rating || "4.9"}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.dispatchBtn}
+                  onPress={() => handleDispatchWorker(cand.worker_id)}
+                  disabled={dispatchLoadingId === cand.worker_id}
+                >
+                  {dispatchLoadingId === cand.worker_id ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.dispatchBtnText}>Dispatch Now</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.surface.pageBg,
   },
-  scrollContent: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 40,
-    gap: 14,
   },
   alertBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  alertIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  alertTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#991B1B',
-    textAlign: 'center',
-  },
-  alertSub: {
-    fontSize: 13,
-    color: '#7F1D1D',
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  locationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  locTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  locCoords: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 4,
-  },
-  emergencyOption: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: "#DC2626", // Red
+    borderRadius: radii.xl,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    ...shadows.elevated,
+    marginBottom: 14,
   },
-  emergencyOptionActive: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FFF1F2',
+  alertTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  optionIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionIconBoxActive: {
-    backgroundColor: '#DC2626',
-  },
-  optionTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  optionTrade: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  slaBadge: {
-    backgroundColor: '#FEE2E2',
+  alertPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: radii.full,
   },
-  slaText: {
-    color: '#DC2626',
-    fontSize: 10,
-    fontWeight: '800',
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radii.full,
+    backgroundColor: "#FFFFFF",
   },
-  optionDesc: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
-  },
-  sosButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 14,
-    paddingVertical: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 8,
-    shadowColor: '#DC2626',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  sosButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
+  alertPillText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-  dispatchedCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
+  slaBadge: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  slaText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#DC2626",
+  },
+  alertTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
+  },
+  alertSub: {
+    fontSize: 11.5,
+    color: "#FEE2E2",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  formCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: colors.surface.border,
+    ...shadows.card,
+    marginBottom: 14,
+  },
+  formSectionTitle: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+    marginBottom: 6,
+  },
+  chipScroll: {
+    marginBottom: 12,
+  },
+  tradeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    borderRadius: radii.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  tradeChipActive: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  tradeChipText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  tradeChipTextActive: {
+    color: "#B91C1C",
+    fontWeight: "700",
+  },
+  locBox: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    marginTop: 8,
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
-  dispatchedTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#166534',
-    textAlign: 'center',
+  locInput: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.text.primary,
+    padding: 0,
   },
-  dispatchedSub: {
+  descInput: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    padding: 10,
+    fontSize: 12,
+    color: colors.text.primary,
+    minHeight: 50,
+    textAlignVertical: "top",
+    marginBottom: 14,
+  },
+  findBtn: {
+    backgroundColor: "#DC2626",
+    paddingVertical: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
+    ...shadows.elevated,
+  },
+  findBtnText: {
+    color: "#FFFFFF",
     fontSize: 13,
-    color: '#475569',
-    textAlign: 'center',
-    lineHeight: 18,
+    fontWeight: "bold",
+  },
+  candidatesCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    ...shadows.card,
+    marginBottom: 20,
+  },
+  candidatesHeader: {
+    marginBottom: 12,
+  },
+  candidatesTitle: {
+    fontSize: 13.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  candidatesSub: {
+    fontSize: 11,
+    color: colors.text.muted,
+    marginTop: 1,
+  },
+  candItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  candLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  candAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  candAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  candName: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  candCoop: {
+    fontSize: 10,
+    color: colors.text.muted,
+  },
+  candMeta: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  candDist: {
+    fontSize: 10.5,
+    color: colors.brand.primary,
+    fontWeight: "600",
+  },
+  candRating: {
+    fontSize: 10.5,
+    color: "#D97706",
+    fontWeight: "bold",
+  },
+  dispatchBtn: {
+    backgroundColor: "#DC2626",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radii.md,
+  },
+  dispatchBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  successCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: radii.xl,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: "#A7F3D0",
+    ...shadows.elevated,
+    marginBottom: 20,
+  },
+  successHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  successTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.brand.dark,
+  },
+  successSub: {
+    fontSize: 11.5,
+    color: colors.brand.emerald800,
+    marginTop: 1,
   },
   etaBox: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 8,
+    backgroundColor: "#ECFDF5",
+    borderRadius: radii.lg,
+    padding: 12,
+    alignItems: "center",
+    marginBottom: 12,
   },
-  etaText: {
-    color: '#15803D',
-    fontWeight: '800',
-    fontSize: 13,
+  etaLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.brand.primary,
+    letterSpacing: 0.5,
+  },
+  etaTime: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: colors.brand.dark,
+    marginVertical: 2,
+  },
+  etaSub: {
+    fontSize: 10.5,
+    color: "#047857",
+  },
+  dispatchedWorkerBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: radii.lg,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    marginBottom: 14,
+    gap: 2,
+  },
+  workerLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    color: colors.text.subtle,
+    letterSpacing: 0.5,
+  },
+  dispatchedName: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: colors.text.primary,
+  },
+  dispatchedPhone: {
+    fontSize: 11,
+    color: colors.brand.primary,
+  },
+  dispatchedAddress: {
+    fontSize: 10.5,
+    color: colors.text.secondary,
   },
   backHomeBtn: {
-    backgroundColor: '#1E3A8A',
-    paddingHorizontal: 24,
+    backgroundColor: colors.brand.primary,
     paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 12,
+    borderRadius: radii.lg,
+    alignItems: "center",
   },
-  backHomeText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  cancelBtnText: {
-    color: '#64748B',
+  backHomeBtnText: {
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "bold",
   },
 });

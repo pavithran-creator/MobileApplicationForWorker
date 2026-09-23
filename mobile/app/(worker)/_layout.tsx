@@ -1,58 +1,59 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Header from '../../components/Header';
-import { useI18n } from '../../lib/i18n';
+import React from "react";
+import { Tabs } from "expo-router";
+import { useLang } from "../../lib/i18n";
+import { colors } from "../../lib/theme";
+import { Briefcase, ShieldCheck, User } from "lucide-react-native";
 
 export default function WorkerTabsLayout() {
-  const { t } = useI18n();
+  const { t } = useLang();
 
   return (
     <Tabs
       screenOptions={{
-        header: () => <Header title="Cooperative Worker Portal" showEmergency={false} />,
-        tabBarActiveTintColor: '#16A34A',
-        tabBarInactiveTintColor: '#64748B',
+        headerShown: false,
+        tabBarActiveTintColor: colors.brand.primary, // #0F5132
+        tabBarInactiveTintColor: colors.text.muted,    // #64748B
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E2E8F0',
+          backgroundColor: "#FFFFFF",
+          borderTopWidth: 1,
+          borderTopColor: colors.surface.border,
           height: 60,
           paddingBottom: 8,
-          paddingTop: 6,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: "700",
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Jobs',
-          tabBarLabel: 'Jobs Queue',
+          title: t("nav.jobs_tab", "Assigned Jobs"),
+          tabBarLabel: t("nav.jobs_tab", "Assigned Jobs"),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="briefcase-outline" size={size} color={color} />
+            <Briefcase size={size || 20} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="welfare"
         options={{
-          title: 'Welfare',
-          tabBarLabel: 'Coop Welfare',
+          title: t("nav.welfare_tab", "Welfare & ESI"),
+          tabBarLabel: t("nav.welfare_tab", "Welfare & ESI"),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shield-checkmark-outline" size={size} color={color} />
+            <ShieldCheck size={size || 20} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarLabel: 'My Society',
+          title: t("nav.profile_tab", "My Profile"),
+          tabBarLabel: t("nav.profile_tab", "My Profile"),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-circle-outline" size={size} color={color} />
+            <User size={size || 20} color={color} />
           ),
         }}
       />
@@ -65,3 +66,4 @@ export default function WorkerTabsLayout() {
     </Tabs>
   );
 }
+
